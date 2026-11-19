@@ -16,8 +16,11 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.HandlerList
 import org.bukkit.event.Listener
+import org.bukkit.event.player.PlayerDropItemEvent
+import org.bukkit.event.player.PlayerInputEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import org.java_websocket.WebSocket
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -47,11 +50,34 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
 
     private val logger = Logger.getLogger("VoiceBridge-Web")
 
+    private enum class IngameTrigger {
+        OFF,
+        DOUBLE_SHIFT,
+        DOUBLE_CTRL,
+        SHIFT_F,
+        SHIFT_Q;
+
+        companion object {
+            fun fromKey(raw: String?): IngameTrigger = when (raw?.lowercase()) {
+                "double_shift" -> DOUBLE_SHIFT
+                "double_ctrl" -> DOUBLE_CTRL
+                "shift_f", "sneak_swap_mic" -> SHIFT_F
+                "shift_q" -> SHIFT_Q
+                else -> OFF
+            }
+        }
+    }
+
     private class WebSession(
         val sessionId: UUID,
         val playerUuid: UUID,
         val playerName: String,
-        @Volatile var conn: WebSocket? = null
+        @Volatile var conn: WebSocket? = null,
+        @Volatile var ingameTrigger: IngameTrigger = IngameTrigger.OFF,
+        @Volatile var prevSneakInput: Boolean = false,
+        @Volatile var prevSprintInput: Boolean = false,
+        @Volatile var lastShiftPressMs: Long = 0L,
+        @Volatile var lastCtrlPressMs: Long = 0L
     )
 
     // sessionId -> session, playerUuid -> sessionId, connection -> session
@@ -142,6 +168,10 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
         reserveSession(event.player)
+        // Delay 1 tick so Bukkit.getOnlinePlayers() includes the newly joined player.
+        plugin.server.globalRegionScheduler.runDelayed(plugin, { _ ->
+            broadcastPlayerList()
+        }, 1L)
     }
 
     /**
@@ -192,7 +222,77 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         }
         unregisterVoiceConnected(session.playerUuid)
         cleanupGameAudio(session.playerUuid)
+        broadcastPlayerList(excludeUuid = event.player.uniqueId)
         logger.info("Web voice session $sessionId removed (${event.player.name} quit)")
+    }
+
+    @EventHandler
+    fun onPlayerInput(event: PlayerInputEvent) {
+        val session = activeSessionFor(event.player.uniqueId) ?: return
+        val input = event.input
+        val nowSneak = input.isSneak
+        val nowSprint = input.isSprint
+        val wasSneak = session.prevSneakInput
+        val wasSprint = session.prevSprintInput
+        session.prevSneakInput = nowSneak
+        session.prevSprintInput = nowSprint
+
+        val conn = session.conn ?: return
+        val now = System.currentTimeMillis()
+
+        when (session.ingameTrigger) {
+            IngameTrigger.DOUBLE_SHIFT -> {
+                if (!wasSneak && nowSneak) {
+                    val prev = session.lastShiftPressMs
+                    if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
+                        session.lastShiftPressMs = 0L
+                        triggerMicToggleFromIngame(event.player, conn)
+                    } else {
+                        session.lastShiftPressMs = now
+                    }
+                }
+            }
+            IngameTrigger.DOUBLE_CTRL -> {
+                if (!wasSprint && nowSprint) {
+                    val prev = session.lastCtrlPressMs
+                    if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
+                        session.lastCtrlPressMs = 0L
+                        triggerMicToggleFromIngame(event.player, conn)
+                    } else {
+                        session.lastCtrlPressMs = now
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onPlayerSwapHandItems(event: PlayerSwapHandItemsEvent) {
+        val session = activeSessionFor(event.player.uniqueId) ?: return
+        if (session.ingameTrigger != IngameTrigger.SHIFT_F) return
+        if (!event.player.isSneaking && !session.prevSneakInput) return
+        val conn = session.conn ?: return
+        event.isCancelled = true
+        triggerMicToggleFromIngame(event.player, conn)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onPlayerDropItem(event: PlayerDropItemEvent) {
+        val session = activeSessionFor(event.player.uniqueId) ?: return
+        if (session.ingameTrigger != IngameTrigger.SHIFT_Q) return
+        if (!event.player.isSneaking && !session.prevSneakInput) return
+        val conn = session.conn ?: return
+        event.isCancelled = true
+        triggerMicToggleFromIngame(event.player, conn)
+    }
+
+    private fun triggerMicToggleFromIngame(player: Player, conn: WebSocket) {
+        sendSafe(conn, """{"type":"control","action":"mic_toggle"}""")
+        player.sendActionBar(
+            Component.text("[Voice] ", NamedTextColor.GOLD)
+                .append(Component.text("Microphone toggled", NamedTextColor.AQUA))
+        )
     }
 
     private fun sendLinkIfActive(playerUuid: UUID, sessionId: UUID) {
@@ -249,11 +349,10 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
 
         session.conn = conn
         byConn[conn] = session
-        try {
-            conn.send(infoJson("Connected as ${session.playerName}"))
-        } catch (_: Exception) {
-        }
+        sendSafe(conn, infoJson("Connected as ${session.playerName}"))
+        sendSafe(conn, welcomeJson(session))
         registerVoiceConnected(session.playerUuid)
+        broadcastPlayerList()
         logger.info("Web page connected for ${session.playerName} (session ${session.sessionId})")
     }
 
@@ -288,8 +387,39 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     }
 
     fun onText(conn: WebSocket, text: String) {
-        // No client text protocol in v1 (open mic). Ignore but log for debugging.
-        logger.fine("Ignoring text message from web client: ${text.take(64)}")
+        val session = byConn[conn] ?: return
+        when (extractJsonString(text, "type")) {
+            "config" -> {
+                val trigger = IngameTrigger.fromKey(extractJsonString(text, "ingameTrigger"))
+                session.ingameTrigger = trigger
+                session.lastShiftPressMs = 0L
+                session.lastCtrlPressMs = 0L
+                logger.fine("Updated in-game trigger for ${session.playerName}: $trigger")
+            }
+            "mic_state" -> {
+                val muted = extractJsonBoolean(text, "muted") ?: return
+                val notify = extractJsonBoolean(text, "notify") == true
+                if (notify) {
+                    val player = Bukkit.getPlayer(session.playerUuid) ?: return
+                    val stateText = if (muted) {
+                        Component.text("Mic: OFF", NamedTextColor.RED)
+                    } else {
+                        Component.text("Mic: ON", NamedTextColor.GREEN)
+                    }
+                    player.scheduler.run(plugin, { _ ->
+                        player.sendActionBar(
+                            Component.text("[Voice] ", NamedTextColor.GOLD).append(stateText)
+                        )
+                    }, null)
+                }
+            }
+            "request_players" -> {
+                sendSafe(conn, buildPlayersJson())
+            }
+            else -> {
+                logger.fine("Ignoring text message from web client: ${text.take(64)}")
+            }
+        }
     }
 
     /**
@@ -307,7 +437,38 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         session.conn = null
         unregisterVoiceConnected(session.playerUuid)
         cleanupGameAudio(session.playerUuid)
+        broadcastPlayerList()
         logger.info("Web page disconnected for ${session.playerName} (session ${session.sessionId})")
+    }
+
+    /**
+     * Triggers a control action (e.g. "mic_toggle") from an in-game command.
+     * Returns true if the player has an active connected web page; otherwise resends their link.
+     */
+    fun triggerControlFromCommand(player: Player, action: String): Boolean {
+        val session = activeSessionFor(player.uniqueId)
+        val conn = session?.conn
+        if (conn != null) {
+            sendSafe(conn, """{"type":"control","action":"${escapeJson(action)}"}""")
+            return true
+        }
+        val sessionId = byPlayer[player.uniqueId]
+        if (sessionId != null) {
+            sendLinkIfActive(player.uniqueId, sessionId)
+        }
+        return false
+    }
+
+    /**
+     * Broadcasts the current online server player list (with voice mod/web status)
+     * to every connected browser page.
+     */
+    fun broadcastPlayerList(excludeUuid: UUID? = null) {
+        if (byConn.isEmpty()) return
+        val payload = buildPlayersJson(excludeUuid)
+        for (conn in byConn.keys) {
+            sendSafe(conn, payload)
+        }
     }
 
     // --- Outbound: game → web pages ---
@@ -398,6 +559,68 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         return out
     }
 
+    private fun activeSessionFor(playerUuid: UUID): WebSession? {
+        val sessionId = byPlayer[playerUuid] ?: return null
+        return sessions[sessionId]
+    }
+
+    private fun sendSafe(conn: WebSocket, message: String) {
+        try {
+            if (conn.isOpen) conn.send(message)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun welcomeJson(session: WebSession): String =
+        """{"type":"welcome","playerUuid":"${session.playerUuid}","playerName":"${escapeJson(session.playerName)}","capabilities":["players","ingame_mic"]}"""
+
+    private fun buildPlayersJson(excludeUuid: UUID? = null): String {
+        val online = try {
+            Bukkit.getOnlinePlayers().toList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val sb = StringBuilder()
+        sb.append("""{"type":"players","players":[""")
+        var first = true
+        for (p in online) {
+            val uuid = p.uniqueId
+            if (excludeUuid != null && uuid == excludeUuid) continue
+            if (!first) sb.append(',')
+            first = false
+
+            val modSession = plugin.sessionManager.getSession(uuid)
+            val hasSvc = modSession?.hasModType(ModType.SIMPLE_VOICE_CHAT) == true
+            val hasPv = modSession?.hasModType(ModType.PLASMO_VOICE) == true
+            val hasWeb = activeSessionFor(uuid)?.conn != null
+            val hasVoice = hasSvc || hasPv || hasWeb
+
+            sb.append("""{"uuid":"$uuid","name":"${escapeJson(p.name)}","mods":[""")
+            var modFirst = true
+            if (hasSvc) {
+                sb.append("\"SVC\"")
+                modFirst = false
+            }
+            if (hasPv) {
+                if (!modFirst) sb.append(',')
+                sb.append("\"PV\"")
+            }
+            sb.append("""],"web":$hasWeb,"voice":$hasVoice}""")
+        }
+        sb.append("]}")
+        return sb.toString()
+    }
+
+    private fun extractJsonString(json: String, key: String): String? {
+        val regex = Regex(""""${Regex.escape(key)}"\s*:\s*"((?:\\.|[^"\\])*)"""")
+        return regex.find(json)?.groupValues?.getOrNull(1)
+    }
+
+    private fun extractJsonBoolean(json: String, key: String): Boolean? {
+        val regex = Regex(""""${Regex.escape(key)}"\s*:\s*(true|false)""")
+        return regex.find(json)?.groupValues?.getOrNull(1)?.toBooleanStrictOrNull()
+    }
+
     private fun infoJson(message: String) = json("info", message)
     private fun errorJson(message: String) = json("error", message)
 
@@ -417,6 +640,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
 
     companion object {
         private const val MAX_FRAME_BYTES = 1500
+        private const val DOUBLE_TAP_WINDOW_MS = 450L
         private const val MSG_AUDIO: Byte = 0x02
         private const val CLOSE_NORMAL = 1000
         private const val CLOSE_REPLACED = 4001

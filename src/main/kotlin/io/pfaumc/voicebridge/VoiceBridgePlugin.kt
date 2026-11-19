@@ -33,7 +33,8 @@ class VoiceBridgePlugin : JavaPlugin() {
 
     private var svcAdapter: SvcAdapter? = null
     private var pvAdapter: PvAdapter? = null
-    private var webAdapter: WebAdapter? = null
+    internal var webAdapter: WebAdapter? = null
+        private set
 
     private val scope = CoroutineScope(
         SupervisorJob() + CoroutineName("VoiceBridge")
@@ -172,6 +173,11 @@ class VoiceBridgePlugin : JavaPlugin() {
                 VoiceBridgeCommand.buildCommand(this),
                 "Voice Bridge admin commands",
                 listOf("vb")
+            )
+            event.registrar().register(
+                VoiceBridgeCommand.buildWebControlCommand(this, "mic", "mic_toggle", "Microphone"),
+                "Toggle web voice microphone On/Off",
+                listOf("vmic")
             )
         }
     }

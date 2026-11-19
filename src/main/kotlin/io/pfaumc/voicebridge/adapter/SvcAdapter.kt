@@ -85,6 +85,7 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
 
         // Register a fake UDP connection in PV so PV clients see a voice icon
         pvAdapter?.registerBridgedConnection(playerUuid)
+        plugin.audioRelay.webAdapter?.broadcastPlayerList()
     }
 
     private fun onPlayerDisconnected(event: PlayerDisconnectedEvent) {
@@ -95,6 +96,7 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
 
         // Remove only the SVC mod type; session is fully removed only when all mod types are gone
         plugin.sessionManager.unregister(playerUuid, ModType.SIMPLE_VOICE_CHAT)
+        plugin.audioRelay.webAdapter?.broadcastPlayerList()
 
         // Close any outbound channels for this player
         outboundChannels.remove(playerUuid)?.let { channel ->

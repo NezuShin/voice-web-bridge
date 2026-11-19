@@ -15,6 +15,7 @@ import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
+import org.bukkit.entity.Player
 
 @Suppress("UnstableApiUsage")
 object VoiceBridgeCommand {
@@ -56,6 +57,40 @@ object VoiceBridgeCommand {
                             }
                     )
             )
+            .build()
+    }
+
+    fun buildWebControlCommand(
+        plugin: VoiceBridgePlugin,
+        name: String,
+        action: String,
+        label: String
+    ): LiteralCommandNode<CommandSourceStack> {
+        return Commands.literal(name)
+            .executes { ctx ->
+                val player = ctx.source.sender as? Player
+                if (player == null) {
+                    ctx.source.sender.sendMessage(Component.text("This command can only be used by a player.", NamedTextColor.RED))
+                    return@executes Command.SINGLE_SUCCESS
+                }
+                val web = plugin.webAdapter
+                if (web == null) {
+                    player.sendMessage(Component.text("Web voice chat is disabled on this server.", NamedTextColor.RED))
+                    return@executes Command.SINGLE_SUCCESS
+                }
+                if (web.triggerControlFromCommand(player, action)) {
+                    player.sendActionBar(
+                        Component.text("[Voice] ", ACCENT)
+                            .append(Component.text("$label toggled", NamedTextColor.GREEN))
+                    )
+                } else {
+                    player.sendMessage(
+                        Component.text("[Voice] ", ACCENT)
+                            .append(Component.text("Your browser voice page is not connected yet.", NamedTextColor.YELLOW))
+                    )
+                }
+                Command.SINGLE_SUCCESS
+            }
             .build()
     }
 

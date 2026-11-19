@@ -147,6 +147,7 @@ class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
 
         // Mark this player as connected in SVC so SVC clients see a voice icon
         svcAdapter?.setExternalPlayerConnected(playerUuid, true)
+        plugin.audioRelay.webAdapter?.broadcastPlayerList()
     }
 
     @EventSubscribe
@@ -165,6 +166,7 @@ class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
 
         // Remove only the PV mod type; session is fully removed only when all mod types are gone
         plugin.sessionManager.unregister(playerUuid, ModType.PLASMO_VOICE)
+        plugin.audioRelay.webAdapter?.broadcastPlayerList()
 
         // Clean up outbound sources
         outboundSources.remove(playerUuid)?.remove()

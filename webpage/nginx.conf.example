@@ -30,7 +30,7 @@ server {
         try_files $uri =404;
     }
 
-    location = /voicechat.html {
+    location ~* ^/(voicechat\.html|app\.js|styles\.css|minecraft_font\.ttf)$ {
         try_files $uri =404;
     }
 

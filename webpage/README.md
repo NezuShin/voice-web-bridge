@@ -1,24 +1,49 @@
-# Browser voice page (prototype)
+# Browser voice page
 
-`voicechat.html` + `app.js` implement a minimal browser voice client for
-Voice Bridge. The plugin sends each player a link after they join:
+`voicechat.html` + `styles.css` + `app.js` implement a Simple Voice Chat-styled
+browser voice client for Voice Bridge using `minecraft_font.ttf`. The plugin
+sends each player a link after they join:
 
 ```
 https://bla-bla.com/voicechat.html?id=<session-uuid>
 ```
 
-The page connects to the plugin's embedded WebSocket server, asks for the
-microphone permission on the first click (the prompt only reliably appears
-inside a user gesture), then streams the mic continuously and plays back
-nearby players' audio. Server messages (info/error) are displayed as the last
-message.
+The page connects to the plugin's embedded WebSocket server, prompts for
+microphone permission on user interaction (Enable Microphone or Mic On/Off),
+streams microphone audio, and plays back nearby players' audio with per-speaker
+volume/mute controls. Server messages (info/error) are displayed in the footer
+status bar and the connection event log.
 
-Two selects let the user pick the input/output devices; changes apply
-immediately (the capture pipeline restarts on the new microphone, the output
-switches via `HTMLMediaElement.setSinkId`). A volume slider (0–200%, default
-100%, remembered across reloads) controls the playback gain — useful for
-matching the game client's loudness. Note: `setSinkId` is currently
-Chromium-only; other browsers show a message instead.
+## Features
+
+- **Simple Voice Chat GUI**: Pixel-art Minecraft GUI styling using
+  `minecraft_font.ttf`, live input level meter, local mic loopback test, and
+  optional 8-bit UI sound cues.
+- **Server Players List & Per-Player Volume Controls**:
+  - Live list of online players on the server with voice mod badges
+    (`[SVC]`, `[PV]`, `[SVC+PV]`, `[WEB]`, `[NO VOICE]`), search box, filters
+    (`All`, `Voice Only`, `Speaking`), live speaking highlight, per-player
+    volume sliders (0–200%), quick 100% reset, and per-player mute.
+- **Voice Activation & In-Game Minecraft Mic On/Off Keybind**:
+  - **Voice Activation**: Open Mic or configurable dB threshold + holdover
+    delay, configurable on-screen Mic On/Off button visibility, and Mic Off
+    hardware behavior (Soft Mute, Disable Track, or Release Mic).
+  - **In-Game Minecraft Keybind for Mic On/Off** (zero client mods, synced
+    live via the server): choose from `Double Shift`, `Double Ctrl`,
+    `Shift+F` (cancels item swaps), or `Shift+Q` (cancels item drops while
+    holding an item), plus the `/mic` (`/vmic`) in-game chat command.
+- **Configurable Microphone State Overlay**:
+  - Floating HUD showing live mic state (`SPEAKING`, `MIC ON`, `MIC READY`,
+    `MIC OFF`, `DEAFENED`, `OFFLINE`) with configurable layout (`Icon Only`,
+    `Mic State Badge`, `Full HUD`), themes, scale, opacity, and quick Mic
+    On/Off button.
+  - **Pop Out** launches an always-on-top Document Picture-in-Picture overlay
+    window in Chromium browsers; `?id=<uuid>&overlay=1&transparent=1` is
+    supported for OBS Browser Source.
+- **Audio Devices & Gains**: Input/output device selection (`setSinkId` on
+  Chromium browsers), output volume (0–200%), microphone gain (0–200%), and
+  echo cancellation / noise suppression / auto gain toggles. All preferences
+  persist in `localStorage`.
 
 ## How it works
 
@@ -39,9 +64,15 @@ Chromium-only; other browsers show a message instead.
 | Direction | Message | Meaning |
 |---|---|---|
 | client → server | binary, raw Opus frame | one 20 ms frame (max 1500 bytes) |
+| client → server | `{"type":"config","ingameTrigger":"..."}` | sets in-game Mic On/Off keybind (`off`, `double_shift`, `double_ctrl`, `shift_f`, `shift_q`) |
+| client → server | `{"type":"mic_state","muted":true\|false,"notify":true\|false}` | reports current mic mute state so the server can show action-bar feedback |
+| client → server | `{"type":"request_players"}` | requests fresh online server player list |
 | server → client | binary `[0x02][16-byte speaker uuid][opus]` | audio from one in-game player |
 | server → client | `{"type":"info","message":"..."}` | displayed as last message |
 | server → client | `{"type":"error","message":"..."}` | displayed, then the server closes |
+| server → client | `{"type":"welcome","playerUuid":"...","playerName":"...","capabilities":[...]}` | session identity & server features (`players`, `ingame_mic`) |
+| server → client | `{"type":"players","players":[...]}` | online server players with mod/web voice status |
+| server → client | `{"type":"control","action":"mic_toggle"}` | in-game Minecraft Mic On/Off keybind or `/mic` command |
 | server → client | close code 4001 | this page was replaced by a newer one |
 | server → client | close code 4004 | session not found / bad id |
 
