@@ -26,6 +26,9 @@ replay_pid*
 # Ignore Gradle project-specific cache directory
 .gradle
 
+# Sandbox-local Gradle user home (toolchain/dependency cache, not part of the project)
+.gradle-home
+
 # Ignore Gradle build output directory
 build
 ### Java template

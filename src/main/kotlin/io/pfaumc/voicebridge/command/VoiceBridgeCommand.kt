@@ -157,11 +157,23 @@ object VoiceBridgeCommand {
     }
 
     private fun reloadConfig(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
-        plugin.reloadBridgeConfig()
-        ctx.source.sender.sendMessage(
-            Component.text("✔ ", NamedTextColor.GREEN)
+        val webRestarted = plugin.reloadBridgeConfig()
+        val message = when {
+            webRestarted && plugin.bridgeConfig.webEnabled -> Component.text("✔ ", NamedTextColor.GREEN)
+                .append(Component.text("Config reloaded — web voice server restarted on ", VALUE))
+                .append(
+                    Component.text(
+                        "${plugin.bridgeConfig.webHost}:${plugin.bridgeConfig.webPort}",
+                        NamedTextColor.AQUA
+                    )
+                )
+                .append(Component.text(".", VALUE))
+            webRestarted -> Component.text("✔ ", NamedTextColor.GREEN)
+                .append(Component.text("Config reloaded — web voice server stopped.", VALUE))
+            else -> Component.text("✔ ", NamedTextColor.GREEN)
                 .append(Component.text("Config reloaded.", VALUE))
-        )
+        }
+        ctx.source.sender.sendMessage(message)
         return Command.SINGLE_SUCCESS
     }
 

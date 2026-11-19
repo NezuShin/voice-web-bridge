@@ -298,6 +298,25 @@ Group bridging requires significant design work and is out of scope for v1.
 - PV: `VoicePlayer.isVoiceDisabled()` / `VoicePlayer.isMicrophoneMuted()` / `MuteManager`
 - Both mods suppress events for muted/deafened players, so the bridge respects these states automatically
 
+**Per-player mute (SVC).** SVC enforces "mute this player" entirely on the client: the mute is
+stored as a per-player volume of 0% and is applied in the client's `AudioChannel.writeToSpeaker()`
+only when the packet's channel ID is a UUID present in the client's username cache (populated from
+player states, which exist for every logged-in player, not just SVC users). The bridge therefore
+creates its outbound `EntityAudioChannel` with the **speaker's player UUID as the channel ID**.
+A synthetic channel ID would fall back to the global "Other" category volume, so muted players
+would remain audible. As a bonus, the SVC client automatically closes the channel when the
+speaker's state becomes disconnected.
+
+**Per-player mute (PV).** Plasmo Voice has the mirror problem: its client applies per-player
+mute/volume (`source_<playerUuid>` config keys) only to sources whose `SourceInfo` type is PLAYER
+(`ClientPlayerSource`); entity sources (`ClientEntitySource`) skip that check entirely. The bridge
+therefore creates a `ServerPlayerSource` bound to the SVC speaker for the SVC → PV leg. This works
+because the bridge registers a fake `UdpServerConnection` for SVC-only speakers, which satisfies
+PV's player-info lookup (`VoiceServerPlayerEntity.createPlayerInfo()` throws for players without a
+UDP connection). It falls back to an entity source only if that fake connection cannot be
+registered. The bridge also mirrors PV's `/vmute` check (`MuteManager.getMute()`) in the SVC → PV
+leg, since PV normally enforces server mute at its own UDP ingress, which bridged audio bypasses.
+
 ---
 
 ## 7. Threading Model
@@ -382,7 +401,7 @@ Registered via Brigadier (`LifecycleEvents.COMMANDS`). Alias: `/vb`.
 |---|---|
 | `/voicebridge status` | Active sessions, frame counters, config state |
 | `/voicebridge players` | List connected players with their voice mod |
-| `/voicebridge reload` | Reload `config.yml` at runtime |
+| `/voicebridge reload` | Reload `config.yml` at runtime; rebinds the web voice listener when `web.enabled`/`web.host`/`web.port` changed |
 | `/voicebridge debug [on\|off]` | Toggle debug logging (runtime only) |
 
 Permission: `voicebridge.admin` (default: op).

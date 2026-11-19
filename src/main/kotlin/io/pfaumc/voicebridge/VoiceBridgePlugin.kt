@@ -9,6 +9,7 @@ import io.pfaumc.voicebridge.relay.AudioRelay
 import io.pfaumc.voicebridge.session.ModType
 import io.pfaumc.voicebridge.session.SessionManager
 import io.pfaumc.voicebridge.spatial.SpatialMapper
+import io.pfaumc.voicebridge.web.WebAdapter
 import kotlinx.coroutines.*
 import org.bstats.bukkit.Metrics
 import org.bstats.charts.AdvancedPie
@@ -32,6 +33,7 @@ class VoiceBridgePlugin : JavaPlugin() {
 
     private var svcAdapter: SvcAdapter? = null
     private var pvAdapter: PvAdapter? = null
+    private var webAdapter: WebAdapter? = null
 
     private val scope = CoroutineScope(
         SupervisorJob() + CoroutineName("VoiceBridge")
@@ -77,6 +79,11 @@ class VoiceBridgePlugin : JavaPlugin() {
         svcAdapter?.pvAdapter = pvAdapter
         pvAdapter?.svcAdapter = svcAdapter
 
+        // Start the browser voice page WebSocket server
+        webAdapter = WebAdapter(this)
+        audioRelay.webAdapter = webAdapter
+        webAdapter?.start()
+
         // Start cleanup coroutine
         scope.launch {
             while (isActive) {
@@ -96,6 +103,7 @@ class VoiceBridgePlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        webAdapter?.stop()
         svcAdapter?.shutdown()
         pvAdapter?.shutdown()
         sessionManager.clear()
@@ -103,10 +111,17 @@ class VoiceBridgePlugin : JavaPlugin() {
         logger.info("Voice Bridge disabled")
     }
 
-    fun reloadBridgeConfig() {
+    /**
+     * Reloads config.yml and applies the new values at runtime.
+     *
+     * @return true if the web voice server was (re)started because web settings changed
+     */
+    fun reloadBridgeConfig(): Boolean {
         bridgeConfig = BridgeConfig.load(dataFolder)
         spatialMapper.config = bridgeConfig
+        val webRestarted = webAdapter?.reconfigure(bridgeConfig) ?: false
         logger.info("Voice Bridge config reloaded")
+        return webRestarted
     }
 
     private fun setupMetrics() {
@@ -137,6 +152,9 @@ class VoiceBridgePlugin : JavaPlugin() {
         })
         metrics.addCustomChart(SingleLineChart("bridged_sessions") {
             BridgeMetrics.activeSessions.get()
+        })
+        metrics.addCustomChart(SingleLineChart("web_players") {
+            BridgeMetrics.webActiveSessions.get()
         })
 
         // Config values

@@ -4,18 +4,23 @@ import io.pfaumc.voicebridge.BridgeMetrics
 import io.pfaumc.voicebridge.adapter.PvAdapter
 import io.pfaumc.voicebridge.adapter.SvcAdapter
 import io.pfaumc.voicebridge.config.BridgeConfig
+import io.pfaumc.voicebridge.session.ModType
 import io.pfaumc.voicebridge.session.SessionManager
 import io.pfaumc.voicebridge.spatial.SpatialMapper
+import io.pfaumc.voicebridge.web.WebAdapter
 import org.bukkit.entity.Player
 import java.util.*
 import java.util.logging.Logger
 
 /**
- * Central audio relay that routes voice frames between the two mod adapters.
+ * Central audio relay that routes voice frames between the two mod adapters
+ * and the browser voice page.
  *
  * Audio flow:
  * - SVC player speaks → SvcAdapter receives MicrophonePacketEvent → calls relaySvcToPv()
  * - PV player speaks → PvAdapter receives activation event → calls relayPvToSvc()
+ * - Browser page speaks → WebAdapter relays via the mod adapters directly
+ * - Both relay methods fan out to in-range web pages via WebAdapter
  */
 class AudioRelay(
     private val sessionManager: SessionManager,
@@ -26,6 +31,7 @@ class AudioRelay(
 
     var svcAdapter: SvcAdapter? = null
     var pvAdapter: PvAdapter? = null
+    var webAdapter: WebAdapter? = null
 
     /**
      * Relay audio from a Simple Voice Chat player to all nearby Plasmo Voice players.
@@ -45,6 +51,17 @@ class AudioRelay(
         distance: Float,
         whispering: Boolean
     ) {
+        // Fan out to web pages before the dual-mod skip — dual-mod speakers
+        // must still reach browser listeners. Web listeners with SVC installed
+        // are skipped (they hear this leg natively).
+        webAdapter?.broadcastToWebListeners(
+            speakerUuid = senderUuid,
+            speakerPlayer = senderPlayer,
+            opusData = opusData,
+            distanceBlocks = spatialMapper.getEffectiveDistance(distance.toDouble(), senderPlayer.world),
+            skipMod = ModType.SIMPLE_VOICE_CHAT
+        )
+
         val pv = pvAdapter ?: return
 
         // Skip relay for dual-mod players — PV clients already hear them via PV natively
@@ -91,6 +108,16 @@ class AudioRelay(
         sequenceNumber: Long,
         distance: Short
     ) {
+        // Fan out to web pages before the dual-mod skip. Web listeners with PV
+        // installed are skipped (they hear this leg natively).
+        webAdapter?.broadcastToWebListeners(
+            speakerUuid = senderUuid,
+            speakerPlayer = senderPlayer,
+            opusData = opusData,
+            distanceBlocks = spatialMapper.getEffectiveDistance(distance.toDouble(), senderPlayer.world),
+            skipMod = ModType.PLASMO_VOICE
+        )
+
         val svc = svcAdapter ?: return
 
         // Skip relay for dual-mod players — SVC clients already hear them via SVC natively

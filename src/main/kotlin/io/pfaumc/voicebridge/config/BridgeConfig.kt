@@ -14,7 +14,12 @@ data class BridgeConfig(
     val forceTranscode: Boolean = false,
     val repacing: Boolean = true,
     val repacingJitterFrames: Int = 2,
-    val worldOverrides: Map<String, Double> = emptyMap()
+    val worldOverrides: Map<String, Double> = emptyMap(),
+    val webEnabled: Boolean = true,
+    val webHost: String = "127.0.0.1",
+    val webPort: Int = 8090,
+    val webLinkTemplate: String = "https://bla-bla.com/voicechat.html?id={uuid}",
+    val webLinkDelaySeconds: Long = 5
 ) {
     companion object {
         private val logger = Logger.getLogger("VoiceBridge")
@@ -49,7 +54,15 @@ data class BridgeConfig(
                 forceTranscode = yaml.getBoolean("audio.force-transcode", false),
                 repacing = yaml.getBoolean("audio.repacing", true),
                 repacingJitterFrames = yaml.getInt("audio.jitter-frames", 2),
-                worldOverrides = worldOverrides
+                worldOverrides = worldOverrides,
+                webEnabled = yaml.getBoolean("web.enabled", true),
+                webHost = yaml.getString("web.host", "127.0.0.1") ?: "127.0.0.1",
+                webPort = yaml.getInt("web.port", 8090),
+                webLinkTemplate = yaml.getString(
+                    "web.link-template",
+                    "https://bla-bla.com/voicechat.html?id={uuid}"
+                ) ?: "https://bla-bla.com/voicechat.html?id={uuid}",
+                webLinkDelaySeconds = yaml.getLong("web.link-delay-seconds", 5L)
             )
         }
 
@@ -79,6 +92,17 @@ data class BridgeConfig(
               # Frames to pre-buffer before draining (each frame is 20ms). Higher = smoother under
               # jitter but more latency. 2 = ~40ms added.
               jitter-frames: 2
+
+            web:
+              # Embedded WebSocket server for the browser voice page
+              enabled: true
+              # Bind address. 127.0.0.1 means only a local Nginx proxy can reach it.
+              host: 127.0.0.1
+              port: 8090
+              # Link sent to players after joining. {uuid} is replaced with the session id.
+              link-template: "https://bla-bla.com/voicechat.html?id={uuid}"
+              # Delay in seconds before the link message is sent after joining
+              link-delay-seconds: 5
 
             # Per-world distance overrides (optional)
             # worlds:

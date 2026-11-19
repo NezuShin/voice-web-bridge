@@ -159,7 +159,13 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
         var channel = outboundChannels[senderUuid]
         if (channel == null) {
             val entity = api.fromEntity(senderPlayer)
-            val channelId = UUID.nameUUIDFromBytes("voice-bridge-$senderUuid".toByteArray())
+            // IMPORTANT: The channel ID must be the speaker's real player UUID.
+            // SVC clients key every AudioChannel by the packet's channel ID and only apply
+            // per-player mute/volume when that ID is a player UUID present in their username
+            // cache (populated from player states). A synthetic ID like
+            // UUID.nameUUIDFromBytes("voice-bridge-$senderUuid") is never in that cache, so the
+            // client falls back to the global "Other" category volume and muted players remain audible.
+            val channelId = senderUuid
             val newChannel = api.createEntityAudioChannel(channelId, entity)
             if (newChannel == null) {
                 logger.warning("Failed to create EntityAudioChannel for PV player $senderUuid")
@@ -176,6 +182,9 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
             channel = newChannel
         }
 
+        // The SVC API requires refreshing the bound entity for players after death/respawn.
+        // A stale entity would throw on send and leave the speaker silent until they rejoin.
+        channel.updateEntity(api.fromEntity(senderPlayer))
         channel.distance = distance
         channel.send(opusData)
         return true

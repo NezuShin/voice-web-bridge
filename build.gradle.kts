@@ -42,6 +42,12 @@ dependencies {
     compileOnly(kotlin("stdlib"))
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     implementation("org.bstats:bstats-bukkit:3.1.0")
+
+    // Embedded WebSocket server for the browser voice page.
+    // Java-WebSocket requires SLF4J; slf4j-jdk14 routes its logs to java.util.logging.
+    implementation("org.java-websocket:Java-WebSocket:1.6.0")
+    implementation("org.slf4j:slf4j-api:2.0.13")
+    implementation("org.slf4j:slf4j-jdk14:2.0.13")
 }
 
 kotlin {
@@ -55,7 +61,13 @@ tasks {
 
     shadowJar {
         relocate("org.bstats", "io.pfaumc.voicebridge.lib.bstats")
-        minimize()
+        relocate("org.java_websocket", "io.pfaumc.voicebridge.lib.ws")
+        relocate("org.slf4j", "io.pfaumc.voicebridge.lib.slf4j")
+        // Rewrites META-INF/services entries to the relocated class names
+        // (slf4j loads its provider reflectively via ServiceLoader).
+        mergeServiceFiles()
+        // No minimize(): Java-WebSocket and SLF4J load classes reflectively,
+        // which the minimizer strips.
     }
 
     reobfJar {
