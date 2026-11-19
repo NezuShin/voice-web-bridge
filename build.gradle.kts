@@ -68,6 +68,9 @@ tasks {
         mergeServiceFiles()
         // No minimize(): Java-WebSocket and SLF4J load classes reflectively,
         // which the minimizer strips.
+        from(rootProject.file("LICENSE")) { into("META-INF") }
+        from(rootProject.file("LICENSE-EXCEPTION")) { into("META-INF") }
+        from(rootProject.file("THIRD_PARTY_LICENSES.md")) { into("META-INF") }
     }
 
     reobfJar {

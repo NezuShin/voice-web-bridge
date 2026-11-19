@@ -1,18 +1,18 @@
 /*
- * Voice Bridge — Simple Voice Chat style UI & Configurable Overlay
- * Uses vendored minecraft_font.ttf for authentic pixel typography.
+ * Voice Web Bridge — Simple Voice Chat style UI & Configurable Overlay
+ * Uses vendored Pixelify Sans (SIL OFL 1.1) for pixel typography.
  */
 
 @font-face {
-  font-family: 'Minecraft';
-  src: url('minecraft_font.ttf') format('truetype');
-  font-weight: normal;
+  font-family: 'Pixelify Sans';
+  src: url('lib/PixelifySans.ttf') format('truetype');
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  --mc-font: 'Minecraft', 'Courier New', monospace;
+  --mc-font: 'Pixelify Sans', 'Courier New', monospace;
   --bg-deep: #111317;
   --bg-grid-a: #15181d;
   --bg-grid-b: #12151a;

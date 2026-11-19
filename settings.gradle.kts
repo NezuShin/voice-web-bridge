@@ -1,4 +1,4 @@
-rootProject.name = "voice-bridge"
+rootProject.name = "voice-web-bridge"
 
 pluginManagement {
     repositories {

@@ -50,13 +50,13 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
             .load(BukkitVoicechatService::class.java)
         if (service != null) {
             service.registerPlugin(this)
-            logger.info("Registered VoiceBridge as SVC plugin")
+            logger.info("Registered Voice Web Bridge as SVC plugin")
         } else {
             logger.warning("BukkitVoicechatService not available — SVC may not be fully loaded yet")
         }
     }
 
-    override fun getPluginId(): String = "voice-bridge"
+    override fun getPluginId(): String = "voice-web-bridge"
 
     override fun initialize(api: VoicechatApi) {
         if (api is VoicechatServerApi) {

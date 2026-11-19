@@ -46,7 +46,7 @@ class VoiceBridgePlugin : JavaPlugin() {
         // Load config
         bridgeConfig = BridgeConfig.load(dataFolder)
         if (!bridgeConfig.enabled) {
-            logger.info("Voice Bridge is disabled in config")
+            logger.info("Voice Web Bridge is disabled in config")
             return
         }
 
@@ -99,7 +99,7 @@ class VoiceBridgePlugin : JavaPlugin() {
         // Register bStats custom charts
         setupMetrics()
 
-        logger.info("Voice Bridge enabled — bridging Simple Voice Chat <-> Plasmo Voice")
+        logger.info("Voice Web Bridge enabled — bridging Simple Voice Chat <-> Plasmo Voice <-> Web")
         BridgeMetrics.log(logger)
     }
 
@@ -109,7 +109,7 @@ class VoiceBridgePlugin : JavaPlugin() {
         pvAdapter?.shutdown()
         sessionManager.clear()
         scope.cancel()
-        logger.info("Voice Bridge disabled")
+        logger.info("Voice Web Bridge disabled")
     }
 
     /**
@@ -121,7 +121,7 @@ class VoiceBridgePlugin : JavaPlugin() {
         bridgeConfig = BridgeConfig.load(dataFolder)
         spatialMapper.config = bridgeConfig
         val webRestarted = webAdapter?.reconfigure(bridgeConfig) ?: false
-        logger.info("Voice Bridge config reloaded")
+        logger.info("Voice Web Bridge config reloaded")
         return webRestarted
     }
 
@@ -171,8 +171,8 @@ class VoiceBridgePlugin : JavaPlugin() {
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(
                 VoiceBridgeCommand.buildCommand(this),
-                "Voice Bridge admin commands",
-                listOf("vb")
+                "Voice Web Bridge admin commands",
+                listOf("vb", "voicewebbridge", "vwb")
             )
             event.registrar().register(
                 VoiceBridgeCommand.buildWebControlCommand(this, "mic", "mic_toggle", "Microphone"),

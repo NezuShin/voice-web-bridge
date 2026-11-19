@@ -142,7 +142,7 @@ object VoiceBridgeCommand {
         ctx.source.sender.sendMessage(
             Component.join(
                 JoinConfiguration.newlines(),
-                header("Voice Bridge Status"),
+                header("Voice Web Bridge Status"),
                 stat("Active sessions", BridgeMetrics.activeSessions.get()),
                 stat("SVC → PV frames", BridgeMetrics.svcToPlasmoFrames.get()),
                 stat("PV → SVC frames", BridgeMetrics.plasmoToSvcFrames.get()),
@@ -166,10 +166,10 @@ object VoiceBridgeCommand {
     private fun showPlayers(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
         val sessions = plugin.sessionManager.getAllSessions()
         if (sessions.isEmpty()) {
-            ctx.source.sender.sendMessage(Component.text("No active voice bridge sessions.", LABEL))
+            ctx.source.sender.sendMessage(Component.text("No active Voice Web Bridge sessions.", LABEL))
             return Command.SINGLE_SUCCESS
         }
-        val lines = mutableListOf(header("Voice Bridge Players (${sessions.size})"))
+        val lines = mutableListOf(header("Voice Web Bridge Players (${sessions.size})"))
         for (session in sessions) {
             val activeIndicator = if (session.active) {
                 Component.text(" ●", NamedTextColor.GREEN)
@@ -237,7 +237,7 @@ object VoiceBridgeCommand {
         ctx.source.sender.sendMessage(
             Component.join(
                 JoinConfiguration.newlines(),
-                header("Voice Bridge Commands"),
+                header("Voice Web Bridge Commands"),
                 cmdLine("/vb status", "Show bridge status and metrics"),
                 cmdLine("/vb players", "List connected players and their voice mod"),
                 cmdLine("/vb reload", "Reload configuration"),

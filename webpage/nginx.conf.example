@@ -1,7 +1,7 @@
-# Example Nginx site for the Voice Bridge browser page.
+# Example Nginx site for the Voice Web Bridge browser page.
 #
 # Serves the static page from this directory and proxies the WebSocket to the
-# plugin's embedded server (web.host / web.port in plugins/voice-bridge/config.yml,
+# plugin's embedded server (web.host / web.port in plugins/voice-web-bridge/config.yml,
 # defaults: 127.0.0.1:8090).
 #
 # Adapt: server_name, TLS certificate paths, and the root/alias to this folder.
@@ -22,15 +22,15 @@ server {
 
     # --- Static page + vendored assets ---
     # Example with root pointing at the webpage/ directory of this project:
-    root /srv/voice-bridge/webpage;
+    root /srv/voice-web-bridge/webpage;
     index voicechat.html;
 
     location /lib/ {
-        # Vendored opus-recorder assets (served same-origin — workers require it)
+        # Vendored opus-recorder and Pixelify Sans font assets (served same-origin — workers require it)
         try_files $uri =404;
     }
 
-    location ~* ^/(voicechat\.html|app\.js|styles\.css|minecraft_font\.ttf)$ {
+    location ~* ^/(voicechat\.html|app\.js|styles\.css)$ {
         try_files $uri =404;
     }
 

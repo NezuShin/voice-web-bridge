@@ -1,8 +1,9 @@
 # Browser voice page
 
 `voicechat.html` + `styles.css` + `app.js` implement a Simple Voice Chat-styled
-browser voice client for Voice Bridge using `minecraft_font.ttf`. The plugin
-sends each player a link after they join:
+browser voice client for Voice Web Bridge using the vendored
+[Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL OFL 1.1,
+`lib/PixelifySans.ttf`). The plugin sends each player a link after they join:
 
 ```
 https://bla-bla.com/voicechat.html?id=<session-uuid>
@@ -17,7 +18,7 @@ status bar and the connection event log.
 ## Features
 
 - **Simple Voice Chat GUI**: Pixel-art Minecraft GUI styling using
-  `minecraft_font.ttf`, live input level meter, local mic loopback test, and
+  `lib/PixelifySans.ttf`, live input level meter, local mic loopback test, and
   optional 8-bit UI sound cues.
 - **Server Players List & Per-Player Volume Controls**:
   - Live list of online players on the server with voice mod badges
@@ -118,3 +119,19 @@ synthetic pages must report `ratio ≈ 1.000` and `freq ≈ 440.00`.
 ```
 node .test/verify.js
 ```
+
+## Licenses & Corresponding Source
+
+- The browser page (`voicechat.html`, `styles.css`, `app.js`) is part of this
+  project and licensed under **GPLv3** (see [`../LICENSE`](../LICENSE) and
+  [`../LICENSE-EXCEPTION`](../LICENSE-EXCEPTION)).
+- `lib/encoderWorker.min.js`, `lib/decoderWorker.min.js`, and
+  `lib/decoderWorker.min.wasm` are vendored from
+  [opus-recorder v8.0.5](https://github.com/chris-rudmin/opus-recorder/tree/v8.0.5)
+  (commit `fdfdadeeb9bc9d045c59dc75ebefed390e4ad6dc`) under MIT / BSD-3-Clause
+  (see [`lib/opus-recorder-LICENSE.md`](lib/opus-recorder-LICENSE.md)). Per
+  GPLv3 Section 6, when distributing packaged releases containing these
+  prebuilt binaries, provide the `opus-recorder` v8.0.5 source archive
+  alongside the release (see [`../THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)).
+- `lib/PixelifySans.ttf` is licensed exclusively under the **SIL Open Font
+  License 1.1** (see [`lib/PixelifySans-LICENSE.txt`](lib/PixelifySans-LICENSE.txt)).

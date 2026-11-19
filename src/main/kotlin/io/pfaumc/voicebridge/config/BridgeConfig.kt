@@ -67,7 +67,7 @@ data class BridgeConfig(
         }
 
         private val DEFAULT_CONFIG = """
-            # Voice Bridge Configuration
+            # Voice Web Bridge Configuration
             bridge:
               enabled: true
               debug: false

@@ -1,5 +1,5 @@
 /*
- * Voice Bridge — Simple Voice Chat style browser client
+ * Voice Web Bridge — Simple Voice Chat style browser client
  *
  * - Captures mic PCM via Web Audio, applies configurable gain and Voice
  *   Activation (Open Mic or dB threshold + holdover), and encodes
@@ -522,7 +522,7 @@
         updateUiState();
         return;
       }
-      show('Connected to Voice Bridge.');
+      show('Connected to Voice Web Bridge.');
       maybeAutoStartMicOnConnect();
       updateUiState();
     };
@@ -1766,7 +1766,7 @@
       ovSubLine.classList.add('hidden');
     } else {
       ovSubLine.classList.remove('hidden');
-      ovSubLine.textContent = hasPlayerIdentity ? playerName : (wsState === 'connected' ? 'Connected' : 'Voice Bridge');
+      ovSubLine.textContent = hasPlayerIdentity ? playerName : (wsState === 'connected' ? 'Connected' : 'Voice Web Bridge');
     }
 
     // Overlay quick mic button
@@ -2040,8 +2040,8 @@
       var pipDoc = win.document;
 
       var fontStyle = pipDoc.createElement('style');
-      var fontUrl = new URL('minecraft_font.ttf', window.location.href).href;
-      fontStyle.textContent = "@font-face { font-family: 'Minecraft'; src: url('" + fontUrl + "') format('truetype'); font-weight: normal; font-style: normal; }";
+      var fontUrl = new URL('lib/PixelifySans.ttf', window.location.href).href;
+      fontStyle.textContent = "@font-face { font-family: 'Pixelify Sans'; src: url('" + fontUrl + "') format('truetype'); font-weight: 400 700; font-style: normal; }";
       pipDoc.head.appendChild(fontStyle);
 
       var cssLink = pipDoc.createElement('link');
@@ -2049,7 +2049,7 @@
       cssLink.href = new URL('styles.css', window.location.href).href;
       pipDoc.head.appendChild(cssLink);
 
-      pipDoc.title = 'Voice Bridge Overlay';
+      pipDoc.title = 'Voice Web Bridge Overlay';
       pipDoc.body.className = 'pip-window';
 
       var svgDefs = document.getElementById('svg-defs');

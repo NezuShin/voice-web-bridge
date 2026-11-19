@@ -2,9 +2,11 @@ name: $name
 version: $version
 main: $main
 api-version: "$apiVersion"
-author: andreypfau
-website: https://modrinth.com/plugin/voice-bridge
-description: Bridges voice communication between Simple Voice Chat and Plasmo Voice
+authors:
+  - andreypfau
+  - nezushin
+website: https://github.com/NezuShin/voice-bridge
+description: Bridges proximity voice chat between Simple Voice Chat, Plasmo Voice, and a browser voice client
 load: POSTWORLD
 folia-supported: true
 
@@ -18,5 +20,5 @@ libraries:
 
 permissions:
   voicebridge.admin:
-    description: Allows use of Voice Bridge admin commands
+    description: Allows use of Voice Web Bridge admin commands
     default: op

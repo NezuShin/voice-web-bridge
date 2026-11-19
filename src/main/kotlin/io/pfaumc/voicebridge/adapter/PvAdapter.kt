@@ -37,10 +37,10 @@ import java.util.logging.Logger
  * - Creates ServerPlayerSources to relay SVC player audio to PV clients
  */
 @Addon(
-    id = "voice-bridge",
-    name = "Voice Bridge",
-    version = "0.1.0",
-    authors = ["VoiceBridge"]
+    id = "voice-web-bridge",
+    name = "Voice Web Bridge",
+    version = "1.1.1",
+    authors = ["andreypfau", "nezushin"]
 )
 class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
 
@@ -84,7 +84,7 @@ class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
         // and call onAddonInitialize().
         try {
             PlasmoVoiceServer.getAddonsLoader().load(this)
-            logger.info("Registered VoiceBridge as PV addon via AddonsLoader")
+            logger.info("Registered Voice Web Bridge as PV addon via AddonsLoader")
         } catch (e: Exception) {
             logger.warning("Failed to register with PV AddonsLoader: ${e.message}")
         }
