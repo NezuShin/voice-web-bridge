@@ -9,6 +9,7 @@ import de.maxhenkel.voicechat.api.events.EventRegistration
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent
 import de.maxhenkel.voicechat.api.events.PlayerConnectedEvent
 import de.maxhenkel.voicechat.api.events.PlayerDisconnectedEvent
+import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent
 import io.pfaumc.voicebridge.BridgeMetrics
 import io.pfaumc.voicebridge.VoiceBridgePlugin
 import io.pfaumc.voicebridge.session.ModType
@@ -32,13 +33,24 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
 
     private val logger = Logger.getLogger("VoiceBridge-SVC")
 
+    @Volatile
     private var serverApi: VoicechatServerApi? = null
+
+    private var loggedMissingApi = false
+
+    val isApiReady: Boolean
+        get() = serverApi != null
 
     var pvAdapter: PvAdapter? = null
 
-    // EntityAudioChannels for relaying PV player audio to SVC clients.
-    // Key: PV player UUID (the "speaker"), Value: channel that SVC clients listen to.
-    private val outboundChannels = ConcurrentHashMap<UUID, EntityAudioChannel>()
+    private class OutboundChannel(
+        val channel: EntityAudioChannel,
+        val usingPlayerUuid: Boolean
+    )
+
+    // EntityAudioChannels for relaying PV/Web player audio to SVC clients.
+    // Key: speaker UUID, Value: channel that SVC clients listen to.
+    private val outboundChannels = ConcurrentHashMap<UUID, OutboundChannel>()
 
     init {
         // Register this plugin with SVC's Bukkit service
@@ -61,11 +73,13 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
     override fun initialize(api: VoicechatApi) {
         if (api is VoicechatServerApi) {
             this.serverApi = api
+            loggedMissingApi = false
             logger.info("SVC server API initialized")
         }
     }
 
     override fun registerEvents(registration: EventRegistration) {
+        registration.registerEvent(VoicechatServerStartedEvent::class.java, ::onServerStarted)
         registration.registerEvent(MicrophonePacketEvent::class.java, ::onMicrophonePacket)
         registration.registerEvent(PlayerConnectedEvent::class.java, ::onPlayerConnected)
         registration.registerEvent(PlayerDisconnectedEvent::class.java, ::onPlayerDisconnected)
@@ -73,7 +87,18 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
 
     // --- Event Handlers ---
 
+    private fun onServerStarted(event: VoicechatServerStartedEvent) {
+        this.serverApi = event.voicechat
+        loggedMissingApi = false
+        logger.info("SVC server started — VoicechatServerApi ready")
+        plugin.webAdapter?.resyncVoiceConnections()
+    }
+
     private fun onPlayerConnected(event: PlayerConnectedEvent) {
+        if (serverApi == null) {
+            serverApi = event.voicechat
+            loggedMissingApi = false
+        }
         val connection = event.connection
         val playerUuid = connection.player.uuid
         val bukkitPlayer = connection.player.player as? Player
@@ -91,16 +116,18 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
     private fun onPlayerDisconnected(event: PlayerDisconnectedEvent) {
         val playerUuid = event.playerUuid
 
-        // Remove the fake PV connection before unregistering the session
-        pvAdapter?.removeBridgedConnection(playerUuid)
+        // Remove the fake PV connection unless the player is still connected via web voice
+        if (plugin.webAdapter?.isPlayerWebConnected(playerUuid) != true) {
+            pvAdapter?.removeBridgedConnection(playerUuid)
+        }
 
         // Remove only the SVC mod type; session is fully removed only when all mod types are gone
         plugin.sessionManager.unregister(playerUuid, ModType.SIMPLE_VOICE_CHAT)
         plugin.audioRelay.webAdapter?.broadcastPlayerList()
 
         // Close any outbound channels for this player
-        outboundChannels.remove(playerUuid)?.let { channel ->
-            channel.flush()
+        outboundChannels.remove(playerUuid)?.let { entry ->
+            entry.channel.flush()
             logger.fine("Closed outbound channel for disconnected SVC player $playerUuid")
         }
 
@@ -113,6 +140,10 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
      * Relay this audio to PV players via the AudioRelay.
      */
     private fun onMicrophonePacket(event: MicrophonePacketEvent) {
+        val api = serverApi ?: event.voicechat.also {
+            serverApi = it
+            loggedMissingApi = false
+        }
         val senderConnection = event.senderConnection ?: return
         val senderUuid = senderConnection.player.uuid
         val packet = event.packet
@@ -127,7 +158,6 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
         val bukkitPlayer = Bukkit.getPlayer(senderUuid) ?: return
 
         // Get the configured distance
-        val api = serverApi ?: return
         val distance = api.voiceChatDistance.toFloat()
 
         // Relay to PV players
@@ -141,10 +171,10 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
         )
     }
 
-    // --- Outbound: Send audio FROM a PV player TO SVC clients ---
+    // --- Outbound: Send audio FROM a PV/Web player TO SVC clients ---
 
     /**
-     * Send audio from a PV player to nearby SVC clients using EntityAudioChannel.
+     * Send audio from a PV or browser player to nearby SVC clients using EntityAudioChannel.
      *
      * @return true if audio was sent successfully
      */
@@ -155,68 +185,126 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
         sequenceNumber: Long,
         distance: Float
     ): Boolean {
-        val api = serverApi ?: return false
+        val api = serverApi
+        if (api == null) {
+            if (!loggedMissingApi) {
+                loggedMissingApi = true
+                logger.warning("Cannot relay audio to SVC: SVC serverApi is null (did VoicechatServerStartedEvent fire?)")
+            }
+            return false
+        }
 
-        // Get existing channel or create a new one
-        var channel = outboundChannels[senderUuid]
-        if (channel == null) {
+        // Ensure non-SVC speakers are marked connected so SVC clients show them connected
+        // and don't auto-close channels keyed by their player UUID.
+        val svcConn = api.getConnectionOf(senderUuid)
+        if (svcConn != null && !svcConn.isInstalled && !svcConn.isConnected) {
+            svcConn.isConnected = true
+        }
+
+        // Prefer the speaker's player UUID as channelId so SVC's per-player volume/mute works.
+        // If SVC still considers the speaker disconnected (for example, a player who has the SVC
+        // mod installed on their client but is disconnected from SVC UDP and using the web page
+        // as fallback), fall back to a synthetic channelId so SVC clients don't auto-close the
+        // channel on arrival.
+        val usePlayerUuid = svcConn?.isConnected == true
+
+        var entry = outboundChannels[senderUuid]
+        if (entry != null && entry.usingPlayerUuid != usePlayerUuid) {
+            outboundChannels.remove(senderUuid, entry)
+            entry.channel.flush()
+            entry = null
+        }
+
+        if (entry == null) {
             val entity = api.fromEntity(senderPlayer)
-            // IMPORTANT: The channel ID must be the speaker's real player UUID.
-            // SVC clients key every AudioChannel by the packet's channel ID and only apply
-            // per-player mute/volume when that ID is a player UUID present in their username
-            // cache (populated from player states). A synthetic ID like
-            // UUID.nameUUIDFromBytes("voice-bridge-$senderUuid") is never in that cache, so the
-            // client falls back to the global "Other" category volume and muted players remain audible.
-            val channelId = senderUuid
+            val channelId = if (usePlayerUuid) {
+                senderUuid
+            } else {
+                UUID.nameUUIDFromBytes("voice-web-bridge-$senderUuid".toByteArray())
+            }
             val newChannel = api.createEntityAudioChannel(channelId, entity)
             if (newChannel == null) {
-                logger.warning("Failed to create EntityAudioChannel for PV player $senderUuid")
+                logger.warning("Failed to create EntityAudioChannel for external speaker $senderUuid")
                 BridgeMetrics.droppedFrames.incrementAndGet()
                 return false
             }
             newChannel.distance = distance
-            // Set filter once at creation — only send to SVC players who are NOT dual-mod
+            // Target SVC listeners. Exclude dual-mod listeners only when the speaker has
+            // Plasmo Voice natively (dual-mod players hear PV speakers natively in PV).
+            // For web-only speakers, PV's source excludes dual-mod, so SVC delivers to them once.
             newChannel.setFilter { serverPlayer ->
-                val session = plugin.sessionManager.getSession(serverPlayer.uuid)
-                session != null && session.hasModType(ModType.SIMPLE_VOICE_CHAT) && !session.isDualMod()
+                val listenerSession = plugin.sessionManager.getSession(serverPlayer.uuid)
+                if (listenerSession == null || !listenerSession.hasModType(ModType.SIMPLE_VOICE_CHAT)) {
+                    false
+                } else if (listenerSession.isDualMod()) {
+                    plugin.sessionManager.getSession(senderUuid)?.hasModType(ModType.PLASMO_VOICE) != true
+                } else {
+                    true
+                }
             }
-            outboundChannels[senderUuid] = newChannel
-            channel = newChannel
+            val created = OutboundChannel(newChannel, usePlayerUuid)
+            outboundChannels[senderUuid] = created
+            entry = created
         }
 
         // The SVC API requires refreshing the bound entity for players after death/respawn.
         // A stale entity would throw on send and leave the speaker silent until they rejoin.
-        channel.updateEntity(api.fromEntity(senderPlayer))
-        channel.distance = distance
-        channel.send(opusData)
+        entry.channel.updateEntity(api.fromEntity(senderPlayer))
+        entry.channel.distance = distance
+        entry.channel.send(opusData)
         return true
     }
 
     /**
-     * Clean up resources for a PV player who stopped talking.
+     * Clean up resources for a speaker who stopped talking.
      */
     fun flushChannel(senderUuid: UUID) {
-        outboundChannels[senderUuid]?.flush()
+        outboundChannels[senderUuid]?.channel?.flush()
     }
 
     /**
      * Remove channel for a player (e.g., on disconnect).
      */
     fun removeChannel(senderUuid: UUID) {
-        outboundChannels.remove(senderUuid)?.flush()
+        outboundChannels.remove(senderUuid)?.channel?.flush()
     }
 
     /**
      * Mark a non-SVC player as connected/disconnected in SVC's player state.
      * This updates the voice icon for SVC clients.
-     * Only works for players without the SVC mod installed (i.e., PV-only players).
+     * Only works for players without the SVC mod installed (i.e., PV-only or browser players).
      */
     fun setExternalPlayerConnected(playerUuid: UUID, connected: Boolean) {
-        serverApi?.getConnectionOf(playerUuid)?.isConnected = connected
+        val api = serverApi
+        if (api == null) {
+            logger.warning("Cannot set SVC connected=$connected for $playerUuid: SVC serverApi is not initialized")
+            return
+        }
+        val conn = api.getConnectionOf(playerUuid)
+        if (conn == null) {
+            logger.warning("Cannot set SVC connected=$connected for $playerUuid: no SVC VoicechatConnection found")
+            return
+        }
+        if (connected && conn.isInstalled && !conn.isConnected) {
+            logger.info(
+                "Player $playerUuid has the Simple Voice Chat mod installed on their client but is disconnected " +
+                    "from SVC UDP — SVC does not allow plugins to clear the disconnected icon for modded clients, " +
+                    "but bridged audio will still be delivered via a fallback channel."
+            )
+            return
+        }
+        conn.isConnected = connected
+        // If connected state changed, reset any cached channel so the channel ID strategy matches.
+        outboundChannels[playerUuid]?.let { existing ->
+            if (existing.usingPlayerUuid != conn.isConnected) {
+                outboundChannels.remove(playerUuid, existing)
+                existing.channel.flush()
+            }
+        }
     }
 
     fun shutdown() {
-        outboundChannels.values.forEach { it.flush() }
+        outboundChannels.values.forEach { it.channel.flush() }
         outboundChannels.clear()
         logger.info("SVC adapter shut down")
     }

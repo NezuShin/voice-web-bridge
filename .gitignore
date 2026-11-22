@@ -186,3 +186,8 @@ hs_err_pid*
 replay_pid*
 
 run/
+
+# Node.js proxy (self-contained in proxy/)
+proxy/node_modules/
+proxy/dist/
+proxy/.env

@@ -161,8 +161,10 @@ class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
             return
         }
 
-        // Mark this player as disconnected in SVC
-        svcAdapter?.setExternalPlayerConnected(playerUuid, false)
+        // Mark this player as disconnected in SVC unless they are still connected via web voice
+        if (plugin.webAdapter?.isPlayerWebConnected(playerUuid) != true) {
+            svcAdapter?.setExternalPlayerConnected(playerUuid, false)
+        }
 
         // Remove only the PV mod type; session is fully removed only when all mod types are gone
         plugin.sessionManager.unregister(playerUuid, ModType.PLASMO_VOICE)

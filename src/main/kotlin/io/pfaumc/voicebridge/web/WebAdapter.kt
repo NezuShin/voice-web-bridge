@@ -5,6 +5,7 @@ import io.pfaumc.voicebridge.VoiceBridgePlugin
 import io.pfaumc.voicebridge.adapter.PvAdapter
 import io.pfaumc.voicebridge.adapter.SvcAdapter
 import io.pfaumc.voicebridge.config.BridgeConfig
+import io.pfaumc.voicebridge.config.WebMode
 import io.pfaumc.voicebridge.session.ModType
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
@@ -21,7 +22,6 @@ import org.bukkit.event.player.PlayerInputEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
-import org.java_websocket.WebSocket
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
@@ -36,7 +36,7 @@ import java.util.logging.Logger
  * Audio flow:
  * - Browser mic (raw Opus 48 kHz / 20 ms frames) → relayed to nearby SVC and PV players
  *   through the existing `sendAudioFromExternalPlayer` paths (repacing, encryption and
- *   sequence numbers are handled there).
+ *   sequence numbers are handled there), and forwarded directly to nearby web listeners.
  * - Nearby SVC/PV players speaking → `AudioRelay` fans out to `broadcastToWebListeners`,
  *   which sends `[0x02][speakerUuid][opus]` frames to every in-range web page.
  *
@@ -72,7 +72,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         val sessionId: UUID,
         val playerUuid: UUID,
         val playerName: String,
-        @Volatile var conn: WebSocket? = null,
+        @Volatile var conn: WebClientConnection? = null,
         @Volatile var ingameTrigger: IngameTrigger = IngameTrigger.OFF,
         @Volatile var prevSneakInput: Boolean = false,
         @Volatile var prevSprintInput: Boolean = false,
@@ -83,18 +83,41 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     // sessionId -> session, playerUuid -> sessionId, connection -> session
     private val sessions = ConcurrentHashMap<UUID, WebSession>()
     private val byPlayer = ConcurrentHashMap<UUID, UUID>()
-    private val byConn = ConcurrentHashMap<WebSocket, WebSession>()
+    private val byConn = ConcurrentHashMap<WebClientConnection, WebSession>()
 
-    private var server: WebVoiceServer? = null
+    @Volatile
+    private var transport: WebTransport? = null
 
-    // Web settings the currently running server was started with; null when no server
-    // is running (or web was disabled). Compared on config reload to decide whether
-    // the listener must be rebound.
+    // Web settings the currently running transport was started with; null when disabled.
+    // Compared on config reload to decide whether the transport must be restarted.
     @Volatile
     private var activeWebConfig: BridgeConfig? = null
 
     private val svcAdapter: SvcAdapter? get() = plugin.audioRelay.svcAdapter
     private val pvAdapter: PvAdapter? get() = plugin.audioRelay.pvAdapter
+
+    fun statusSummary(): String = transport?.statusSummary() ?: "disabled"
+
+    fun isPlayerWebConnected(playerUuid: UUID): Boolean =
+        activeSessionFor(playerUuid)?.conn?.isOpen == true
+
+    fun getConnectedWebPlayers(): Map<UUID, String> {
+        val out = LinkedHashMap<UUID, String>()
+        for (session in sessions.values) {
+            if (session.conn?.isOpen == true) {
+                out[session.playerUuid] = session.playerName
+            }
+        }
+        return out
+    }
+
+    fun resyncVoiceConnections() {
+        for (session in sessions.values) {
+            if (session.conn?.isOpen == true) {
+                registerVoiceConnected(session.playerUuid)
+            }
+        }
+    }
 
     // --- Lifecycle ---
 
@@ -107,12 +130,25 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         // Idempotent listener registration — start() may run again after a reload restart
         HandlerList.unregisterAll(this)
         plugin.server.pluginManager.registerEvents(this, plugin)
-        server = WebVoiceServer(cfg.webHost, cfg.webPort, this)
-        logger.info("Starting web voice WebSocket server on ${cfg.webHost}:${cfg.webPort}")
-        server?.start()
+
+        val nextTransport: WebTransport = when (cfg.webMode) {
+            WebMode.SELF_HOSTED -> DirectWebTransport(
+                host = cfg.webHost,
+                port = cfg.webPort,
+                linkTemplateProvider = { plugin.bridgeConfig.webLinkTemplate },
+                adapter = this
+            )
+            WebMode.PROXY -> ProxyWebTransport(
+                plugin = plugin,
+                config = cfg,
+                adapter = this
+            )
+        }
+        transport = nextTransport
+        nextTransport.start()
         activeWebConfig = cfg
         // Players already online never fire PlayerJoinEvent (boot after a plugin reload,
-        // or a web server restart) — reserve their sessions and send them fresh links.
+        // or a web transport restart) — reserve their sessions and send them fresh links.
         ensureSessionsForOnlinePlayers()
     }
 
@@ -121,43 +157,44 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         for (session in sessions.values) {
             val conn = session.conn ?: continue
             try {
-                conn.send(infoJson("Server stopped"))
+                conn.sendText(infoJson("Server stopped"))
                 conn.close(CLOSE_NORMAL, "Server stopped")
             } catch (_: Exception) {
             }
         }
-        try {
-            server?.stop(1000)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-        } catch (_: Exception) {
-        }
-        server = null
+        transport?.stop()
+        transport = null
         sessions.clear()
         byPlayer.clear()
         byConn.clear()
         BridgeMetrics.webActiveSessions.set(0)
         activeWebConfig = null
-        logger.info("Web voice WebSocket server stopped")
     }
 
     /**
-     * Applies a freshly loaded config. The WebSocket listener is rebound only when the
-     * web settings (enabled/host/port) actually changed — an unrelated reload must not
-     * kick connected browser sessions. Returns true if the server was (re)started.
+     * Applies a freshly loaded config. The web transport is restarted only when the
+     * active transport settings actually changed — an unrelated reload must not
+     * kick connected browser sessions. Returns true if the transport was (re)started.
      */
     fun reconfigure(newConfig: BridgeConfig): Boolean {
         val current = activeWebConfig
         val changed = if (current == null) {
             newConfig.webEnabled
+        } else if (current.webEnabled != newConfig.webEnabled || current.webMode != newConfig.webMode) {
+            true
         } else {
-            current.webEnabled != newConfig.webEnabled ||
-                current.webHost != newConfig.webHost ||
-                current.webPort != newConfig.webPort
+            when (newConfig.webMode) {
+                WebMode.SELF_HOSTED ->
+                    current.webHost != newConfig.webHost || current.webPort != newConfig.webPort
+                WebMode.PROXY ->
+                    current.webProxyUrl != newConfig.webProxyUrl ||
+                        current.webProxyServerId != newConfig.webProxyServerId ||
+                        current.webProxyReconnectDelaySeconds != newConfig.webProxyReconnectDelaySeconds
+            }
         }
         if (!changed) return false
 
-        logger.info("Web voice settings changed — restarting web server")
+        logger.info("Web voice settings changed — restarting web transport")
         stop()
         start()
         return true
@@ -194,10 +231,10 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
 
     /**
      * Creates sessions for players who are online but have none yet. Used after the web
-     * server (re)starts, because PlayerJoinEvent only fires for new joins.
+     * transport (re)starts, because PlayerJoinEvent only fires for new joins.
      */
     private fun ensureSessionsForOnlinePlayers() {
-        if (server == null) return
+        if (transport == null) return
         for (player in Bukkit.getOnlinePlayers()) {
             if (byPlayer.containsKey(player.uniqueId)) continue
             reserveSession(player)
@@ -215,7 +252,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
             byConn.remove(conn)
             session.conn = null
             try {
-                conn.send(infoJson("Player left the game"))
+                conn.sendText(infoJson("Player left the game"))
                 conn.close(CLOSE_NORMAL, "Player left the game")
             } catch (_: Exception) {
             }
@@ -287,7 +324,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         triggerMicToggleFromIngame(event.player, conn)
     }
 
-    private fun triggerMicToggleFromIngame(player: Player, conn: WebSocket) {
+    private fun triggerMicToggleFromIngame(player: Player, conn: WebClientConnection) {
         sendSafe(conn, """{"type":"control","action":"mic_toggle"}""")
         player.sendActionBar(
             Component.text("[Voice] ", NamedTextColor.GOLD)
@@ -301,7 +338,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         if (byPlayer[playerUuid] != sessionId) return
         val player = Bukkit.getPlayer(playerUuid) ?: return
 
-        val link = plugin.bridgeConfig.webLinkTemplate.replace("{uuid}", sessionId.toString())
+        val link = transport?.buildSessionLink(sessionId) ?: return
         player.sendMessage(
             Component.text("[", NamedTextColor.GRAY)
                 .append(Component.text("Voice", NamedTextColor.GOLD, TextDecoration.BOLD))
@@ -320,14 +357,14 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         logger.fine("Link sent to ${player.name}: $link")
     }
 
-    // --- WebSocket lifecycle (called from WebVoiceServer threads) ---
+    // --- WebSocket lifecycle (called from transport worker threads) ---
 
     /**
      * Validates and registers a connection for a session id.
      * Missing/unknown id → JSON error + close(4004).
      * Existing connection → informed with a message and closed with 4001.
      */
-    fun onConnect(sessionId: UUID?, conn: WebSocket) {
+    fun onConnect(sessionId: UUID?, conn: WebClientConnection) {
         if (sessionId == null) {
             reject(conn, "Missing id parameter")
             return
@@ -341,7 +378,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         if (old != null && old !== conn) {
             byConn.remove(old)
             try {
-                old.send(infoJson("New page opened; closing this connection"))
+                old.sendText(infoJson("New page opened; closing this connection"))
                 old.close(CLOSE_REPLACED, "New page opened")
             } catch (_: Exception) {
             }
@@ -356,7 +393,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         logger.info("Web page connected for ${session.playerName} (session ${session.sessionId})")
     }
 
-    fun onBinary(conn: WebSocket, opus: ByteArray) {
+    fun onBinary(conn: WebClientConnection, opus: ByteArray) {
         if (opus.isEmpty() || opus.size > MAX_FRAME_BYTES) {
             BridgeMetrics.webDroppedFrames.incrementAndGet()
             return
@@ -371,22 +408,55 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         // Skip a mod's leg when the player has that mod installed natively —
         // their in-game mic already reaches those listeners (avoids double audio).
         val mods = plugin.sessionManager.getSession(session.playerUuid)
+        val routedToPv = mods?.hasModType(ModType.PLASMO_VOICE) != true && pvAdapter != null
+        val routedToSvc = mods?.hasModType(ModType.SIMPLE_VOICE_CHAT) != true && svcAdapter != null
+
         var sent = false
-        if (mods?.hasModType(ModType.PLASMO_VOICE) != true) {
-            val pvDistance = plugin.spatialMapper.svcToPvDistance(distance.toFloat(), player.world)
-            sent = pvAdapter?.sendAudioFromExternalPlayer(
-                session.playerUuid, player, opus, 0L, pvDistance
-            ) == true
+        if (routedToPv) {
+            try {
+                val pvDistance = plugin.spatialMapper.svcToPvDistance(distance.toFloat(), player.world)
+                sent = pvAdapter?.sendAudioFromExternalPlayer(
+                    session.playerUuid, player, opus, 0L, pvDistance
+                ) == true
+            } catch (ex: Exception) {
+                logger.warning("Failed to relay web audio to PV for ${session.playerName}: ${ex.message}")
+            }
         }
-        if (mods?.hasModType(ModType.SIMPLE_VOICE_CHAT) != true) {
-            sent = svcAdapter?.sendAudioFromExternalPlayer(
-                session.playerUuid, player, opus, 0L, distance.toFloat()
-            ) == true || sent
+        if (routedToSvc) {
+            try {
+                sent = svcAdapter?.sendAudioFromExternalPlayer(
+                    session.playerUuid, player, opus, 0L, distance.toFloat()
+                ) == true || sent
+            } catch (ex: Exception) {
+                logger.warning("Failed to relay web audio to SVC for ${session.playerName}: ${ex.message}")
+            }
         }
         if (sent) BridgeMetrics.webToGameFrames.incrementAndGet()
+
+        // Direct web-to-web proximity forwarding. Skip any listener who already
+        // receives this audio natively via SVC or PV so mod users who also keep
+        // the web page open do not hear double audio.
+        broadcastToWebListeners(
+            speakerUuid = session.playerUuid,
+            speakerPlayer = player,
+            opusData = opus,
+            distanceBlocks = distance,
+            shouldSkipListener = { listenerUuid ->
+                val listenerMods = plugin.sessionManager.getSession(listenerUuid)
+                if (listenerMods == null) {
+                    false
+                } else if (listenerMods.isDualMod()) {
+                    // Dual-mod listeners receive web-speaker audio via SVC when routedToSvc and speaker has no PV.
+                    routedToSvc && mods?.hasModType(ModType.PLASMO_VOICE) != true
+                } else {
+                    (routedToPv && listenerMods.hasModType(ModType.PLASMO_VOICE)) ||
+                        (routedToSvc && listenerMods.hasModType(ModType.SIMPLE_VOICE_CHAT))
+                }
+            }
+        )
     }
 
-    fun onText(conn: WebSocket, text: String) {
+    fun onText(conn: WebClientConnection, text: String) {
         val session = byConn[conn] ?: return
         when (extractJsonString(text, "type")) {
             "config" -> {
@@ -429,7 +499,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
      * only removed on quit. This makes page reloads work: the old connection is
      * detached here and the new one takes over in [onConnect].
      */
-    fun onDisconnect(conn: WebSocket) {
+    fun onDisconnect(conn: WebClientConnection) {
         val session = byConn.remove(conn) ?: return
         // Only act if this connection is still the active one
         // (a replaced connection's close event must not touch the new page).
@@ -464,14 +534,13 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
      * to every connected browser page.
      */
     fun broadcastPlayerList(excludeUuid: UUID? = null) {
-        if (byConn.isEmpty()) return
+        val targets = byConn.keys.toList()
+        if (targets.isEmpty()) return
         val payload = buildPlayersJson(excludeUuid)
-        for (conn in byConn.keys) {
-            sendSafe(conn, payload)
-        }
+        transport?.sendTextBatch(targets, payload)
     }
 
-    // --- Outbound: game → web pages ---
+    // --- Outbound: game / web → web pages ---
 
     /**
      * Sends one Opus frame to every web page whose bound player is in range of [speakerPlayer].
@@ -486,25 +555,48 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         distanceBlocks: Double,
         skipMod: ModType
     ) {
+        broadcastToWebListeners(
+            speakerUuid = speakerUuid,
+            speakerPlayer = speakerPlayer,
+            opusData = opusData,
+            distanceBlocks = distanceBlocks,
+            shouldSkipListener = { listenerUuid ->
+                plugin.sessionManager.getSession(listenerUuid)?.hasModType(skipMod) == true
+            }
+        )
+    }
+
+    /**
+     * Sends one Opus frame to every in-range web listener not excluded by [shouldSkipListener].
+     */
+    fun broadcastToWebListeners(
+        speakerUuid: UUID,
+        speakerPlayer: Player,
+        opusData: ByteArray,
+        distanceBlocks: Double,
+        shouldSkipListener: (UUID) -> Boolean
+    ) {
+        val currentTransport = transport ?: return
         if (sessions.isEmpty()) return
         val speakerLoc = speakerPlayer.location
         val maxDistSq = distanceBlocks * distanceBlocks
 
+        val targets = ArrayList<WebClientConnection>(4)
         for (session in sessions.values) {
             if (session.playerUuid == speakerUuid) continue
             val conn = session.conn ?: continue
-            if (plugin.sessionManager.getSession(session.playerUuid)?.hasModType(skipMod) == true) continue
+            if (!conn.isOpen) continue
+            if (shouldSkipListener(session.playerUuid)) continue
             val listener = Bukkit.getPlayer(session.playerUuid) ?: continue
             if (listener.world != speakerLoc.world) continue
             if (listener.location.distanceSquared(speakerLoc) > maxDistSq) continue
-
-            try {
-                conn.send(audioEnvelope(speakerUuid, opusData))
-                BridgeMetrics.gameToWebFrames.incrementAndGet()
-            } catch (_: Exception) {
-                BridgeMetrics.webDroppedFrames.incrementAndGet()
-            }
+            targets.add(conn)
         }
+        if (targets.isEmpty()) return
+
+        val (sent, dropped) = currentTransport.sendBinaryBatch(targets, audioEnvelope(speakerUuid, opusData))
+        if (sent > 0) BridgeMetrics.gameToWebFrames.addAndGet(sent.toLong())
+        if (dropped > 0) BridgeMetrics.webDroppedFrames.addAndGet(dropped.toLong())
     }
 
     // --- Helpers ---
@@ -518,20 +610,36 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     private fun registerVoiceConnected(playerUuid: UUID) {
         val mods = plugin.sessionManager.getSession(playerUuid)
         if (mods?.hasModType(ModType.PLASMO_VOICE) != true) {
-            pvAdapter?.registerBridgedConnection(playerUuid)
+            try {
+                pvAdapter?.registerBridgedConnection(playerUuid)
+            } catch (ex: Exception) {
+                logger.warning("Failed to register PV bridged connection for $playerUuid: ${ex.message}")
+            }
         }
         if (mods?.hasModType(ModType.SIMPLE_VOICE_CHAT) != true) {
-            svcAdapter?.setExternalPlayerConnected(playerUuid, true)
+            try {
+                svcAdapter?.setExternalPlayerConnected(playerUuid, true)
+            } catch (ex: Exception) {
+                logger.warning("Failed to mark SVC player connected for $playerUuid: ${ex.message}")
+            }
         }
     }
 
     private fun unregisterVoiceConnected(playerUuid: UUID) {
         val mods = plugin.sessionManager.getSession(playerUuid)
         if (mods?.hasModType(ModType.PLASMO_VOICE) != true) {
-            pvAdapter?.removeBridgedConnection(playerUuid)
+            try {
+                pvAdapter?.removeBridgedConnection(playerUuid)
+            } catch (ex: Exception) {
+                logger.warning("Failed to remove PV bridged connection for $playerUuid: ${ex.message}")
+            }
         }
         if (mods?.hasModType(ModType.SIMPLE_VOICE_CHAT) != true) {
-            svcAdapter?.setExternalPlayerConnected(playerUuid, false)
+            try {
+                svcAdapter?.setExternalPlayerConnected(playerUuid, false)
+            } catch (ex: Exception) {
+                logger.warning("Failed to mark SVC player disconnected for $playerUuid: ${ex.message}")
+            }
         }
     }
 
@@ -540,9 +648,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         pvAdapter?.cleanupSource(playerUuid)
     }
 
-    private fun reject(conn: WebSocket, message: String) {
+    private fun reject(conn: WebClientConnection, message: String) {
         try {
-            conn.send(errorJson(message))
+            conn.sendText(errorJson(message))
             conn.close(CLOSE_NOT_FOUND, message)
         } catch (_: Exception) {
         }
@@ -564,9 +672,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         return sessions[sessionId]
     }
 
-    private fun sendSafe(conn: WebSocket, message: String) {
+    private fun sendSafe(conn: WebClientConnection, message: String) {
         try {
-            if (conn.isOpen) conn.send(message)
+            if (conn.isOpen) conn.sendText(message)
         } catch (_: Exception) {
         }
     }

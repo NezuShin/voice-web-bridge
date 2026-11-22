@@ -139,15 +139,24 @@ object VoiceBridgeCommand {
 
     private fun showStatus(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
         val debug = plugin.bridgeConfig.debug
+        val webStatus = plugin.webAdapter?.statusSummary() ?: "disabled"
+        val svcReady = plugin.audioRelay.svcAdapter?.isApiReady == true
+        val pvReady = plugin.audioRelay.pvAdapter != null
         ctx.source.sender.sendMessage(
             Component.join(
                 JoinConfiguration.newlines(),
                 header("Voice Web Bridge Status"),
                 stat("Active sessions", BridgeMetrics.activeSessions.get()),
+                stat("SVC API", if (svcReady) "ready" else "NOT READY"),
+                stat("PV Addon", if (pvReady) "ready" else "NOT READY"),
                 stat("SVC → PV frames", BridgeMetrics.svcToPlasmoFrames.get()),
                 stat("PV → SVC frames", BridgeMetrics.plasmoToSvcFrames.get()),
                 stat("Dropped frames", BridgeMetrics.droppedFrames.get()),
                 stat("Transcoded frames", BridgeMetrics.transcodingCount.get()),
+                stat("Web transport", webStatus),
+                stat("Web sessions", BridgeMetrics.webActiveSessions.get()),
+                stat("Web → Game frames", BridgeMetrics.webToGameFrames.get()),
+                stat("Game → Web frames", BridgeMetrics.gameToWebFrames.get()),
                 Component.text("  Debug: ", LABEL)
                     .append(
                         Component.text(
@@ -165,27 +174,46 @@ object VoiceBridgeCommand {
 
     private fun showPlayers(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
         val sessions = plugin.sessionManager.getAllSessions()
-        if (sessions.isEmpty()) {
+        val webConnected = plugin.webAdapter?.getConnectedWebPlayers().orEmpty()
+        if (sessions.isEmpty() && webConnected.isEmpty()) {
             ctx.source.sender.sendMessage(Component.text("No active Voice Web Bridge sessions.", LABEL))
             return Command.SINGLE_SUCCESS
         }
-        val lines = mutableListOf(header("Voice Web Bridge Players (${sessions.size})"))
-        for (session in sessions) {
-            val activeIndicator = if (session.active) {
+        val byUuid = sessions.associateBy { it.playerUuid }
+        val allUuids = linkedSetOf<java.util.UUID>()
+        sessions.forEach { allUuids.add(it.playerUuid) }
+        webConnected.keys.forEach { allUuids.add(it) }
+
+        val lines = mutableListOf(header("Voice Web Bridge Players (${allUuids.size})"))
+        for (uuid in allUuids) {
+            val session = byUuid[uuid]
+            val isWeb = webConnected.containsKey(uuid)
+            val name = session?.playerName ?: webConnected[uuid] ?: uuid.toString()
+
+            var line = Component.text("  ", LABEL)
+                .append(
+                    Component.text(name, VALUE)
+                        .hoverEvent(HoverEvent.showText(Component.text("UUID: $uuid", LABEL)))
+                )
+            if (session != null) {
+                line = line.append(Component.text(" ", LABEL)).append(modTag(session))
+            }
+            if (isWeb) {
+                line = line.append(Component.text(" ", LABEL))
+                    .append(
+                        Component.text("[WEB]", NamedTextColor.YELLOW)
+                            .hoverEvent(HoverEvent.showText(Component.text("Browser voice client connected", NamedTextColor.YELLOW)))
+                    )
+            }
+            val active = (session?.active == true) || isWeb
+            val activeIndicator = if (active) {
                 Component.text(" ●", NamedTextColor.GREEN)
                     .hoverEvent(HoverEvent.showText(Component.text("Active", NamedTextColor.GREEN)))
             } else {
                 Component.text(" ○", NamedTextColor.DARK_GRAY)
                     .hoverEvent(HoverEvent.showText(Component.text("Inactive", NamedTextColor.DARK_GRAY)))
             }
-            lines += Component.text("  ", LABEL)
-                .append(
-                    Component.text(session.playerName, VALUE)
-                        .hoverEvent(HoverEvent.showText(Component.text("UUID: ${session.playerUuid}", LABEL)))
-                )
-                .append(Component.text(" ", LABEL))
-                .append(modTag(session))
-                .append(activeIndicator)
+            lines += line.append(activeIndicator)
         }
         ctx.source.sender.sendMessage(Component.join(JoinConfiguration.newlines(), lines))
         return Command.SINGLE_SUCCESS
@@ -195,16 +223,16 @@ object VoiceBridgeCommand {
         val webRestarted = plugin.reloadBridgeConfig()
         val message = when {
             webRestarted && plugin.bridgeConfig.webEnabled -> Component.text("✔ ", NamedTextColor.GREEN)
-                .append(Component.text("Config reloaded — web voice server restarted on ", VALUE))
+                .append(Component.text("Config reloaded — web voice transport restarted: ", VALUE))
                 .append(
                     Component.text(
-                        "${plugin.bridgeConfig.webHost}:${plugin.bridgeConfig.webPort}",
+                        plugin.webAdapter?.statusSummary() ?: "unknown",
                         NamedTextColor.AQUA
                     )
                 )
                 .append(Component.text(".", VALUE))
             webRestarted -> Component.text("✔ ", NamedTextColor.GREEN)
-                .append(Component.text("Config reloaded — web voice server stopped.", VALUE))
+                .append(Component.text("Config reloaded — web voice transport stopped.", VALUE))
             else -> Component.text("✔ ", NamedTextColor.GREEN)
                 .append(Component.text("Config reloaded.", VALUE))
         }
