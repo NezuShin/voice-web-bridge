@@ -12,6 +12,8 @@ Out of the box, Voice Web Bridge works in **plug-and-play proxy mode**:
 - **For players (3 clicks, zero mods):** Join the server → **1)** Click the personal voice link in chat → **2)** Click **Enable Microphone** → **3)** Allow microphone access in your browser and talk!
 - **Self-hosting still supported:** Prefer hosting the web page on your own domain? Flip one setting (`web.mode: self-hosted`) to run the embedded WebSocket server behind your own Nginx.
 
+![Voice chat in 3 clicks demo](images/voice-web-bridge-demo-1.gif)
+
 ## Highlights
 
 - **Plug-and-play for server owners:** Works immediately after placing the JAR in `plugins/` — connects outbound via a single WebSocket tunnel to `https://voicechat.nezushin.ru` with no firewall/port forwarding or reverse proxy setup required.
