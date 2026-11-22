@@ -25,7 +25,7 @@ import java.util.logging.Logger
 class AudioRelay(
     private val sessionManager: SessionManager,
     private val spatialMapper: SpatialMapper,
-    private val config: BridgeConfig
+    var config: BridgeConfig
 ) {
     private val logger = Logger.getLogger("VoiceBridge")
 
@@ -88,7 +88,7 @@ class AudioRelay(
         }
 
         if (config.debug) {
-            logger.fine("SVC->PV: ${senderPlayer.name} seq=$sequenceNumber dist=$pvDistance whisper=$whispering")
+            logger.info("[Debug] SVC->PV: ${senderPlayer.name} seq=$sequenceNumber dist=$pvDistance whisper=$whispering bytes=${opusData.size}")
         }
     }
 
@@ -139,7 +139,7 @@ class AudioRelay(
         }
 
         if (config.debug) {
-            logger.fine("PV->SVC: ${senderPlayer.name} seq=$sequenceNumber dist=$svcDistance")
+            logger.info("[Debug] PV->SVC: ${senderPlayer.name} seq=$sequenceNumber dist=$svcDistance bytes=${opusData.size}")
         }
     }
 }

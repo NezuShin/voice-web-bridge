@@ -14,9 +14,19 @@ depend:
   - voicechat
   - PlasmoVoice
 
+commands:
+  voicebridge:
+    description: Voice Web Bridge admin commands
+    aliases: [vb, voicewebbridge, vwb]
+  mic:
+    description: Toggle web voice microphone On/Off
+
 libraries:
   - org.jetbrains.kotlin:kotlin-stdlib:2.3.0
   - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1
+  - net.kyori:adventure-text-minimessage:4.23.0
+  - net.kyori:adventure-text-serializer-gson:4.23.0
+  - net.kyori:adventure-text-serializer-legacy:4.23.0
 
 permissions:
   voicebridge.admin:

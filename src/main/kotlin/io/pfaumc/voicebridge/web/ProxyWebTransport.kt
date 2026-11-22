@@ -182,7 +182,8 @@ class ProxyWebTransport(
         } else {
             ProxyTunnelProtocol.encodeMultiText(ids, text)
         }
-        sendTunnelBinary(tunnel, frame)
+        val sent = sendTunnelBinary(tunnel, frame)
+        debugLog { "Proxy -> clients TEXT count=${ids.size} len=${text.length} sent=$sent" }
     }
 
     override fun sendBinaryBatch(targets: Collection<WebClientConnection>, data: ByteArray): Pair<Int, Int> {
@@ -197,7 +198,9 @@ class ProxyWebTransport(
         } else {
             ProxyTunnelProtocol.encodeMultiBinary(ids, data)
         }
-        return if (sendTunnelBinary(tunnel, frame)) {
+        val ok = sendTunnelBinary(tunnel, frame)
+        debugLog { "Proxy -> clients BINARY count=${ids.size} bytes=${data.size} sent=$ok" }
+        return if (ok) {
             ids.size to 0
         } else {
             0 to ids.size
@@ -219,20 +222,23 @@ class ProxyWebTransport(
     internal fun sendClientText(clientId: Int, text: String) {
         val tunnel = activeTunnel ?: return
         if (!tunnelReadyFlag.get() || !tunnel.isOpen) return
-        sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientText(clientId, text))
+        val ok = sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientText(clientId, text))
+        debugLog { "Proxy -> client#$clientId TEXT len=${text.length} sent=$ok" }
     }
 
     internal fun sendClientBinary(clientId: Int, data: ByteArray) {
         val tunnel = activeTunnel ?: return
         if (!tunnelReadyFlag.get() || !tunnel.isOpen) return
-        sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientBinary(clientId, data))
+        val ok = sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientBinary(clientId, data))
+        debugLog { "Proxy -> client#$clientId BINARY bytes=${data.size} sent=$ok" }
     }
 
     internal fun closeClient(clientId: Int, code: Int, reason: String) {
         clients.remove(clientId)?.markClosed()
         val tunnel = activeTunnel ?: return
         if (!tunnelReadyFlag.get() || !tunnel.isOpen) return
-        sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientClose(clientId, code, reason))
+        val ok = sendTunnelBinary(tunnel, ProxyTunnelProtocol.encodeClientClose(clientId, code, reason))
+        debugLog { "Proxy -> client#$clientId CLOSE code=$code reason=$reason sent=$ok" }
     }
 
     // --- Connection & reconnect logic ---
@@ -251,6 +257,7 @@ class ProxyWebTransport(
 
         val socket = TunnelSocket(uri)
         activeTunnel = socket
+        debugLog { "Opening proxy tunnel -> $uri (serverId=$assignedServerId)" }
         try {
             socket.connect()
         } catch (ex: Exception) {
@@ -338,7 +345,7 @@ class ProxyWebTransport(
                 logger.warning("Voice proxy error: $err")
             }
             else -> {
-                logger.fine("Ignoring unknown proxy control message: ${message.take(80)}")
+                debugLog { "Ignoring unknown proxy control message: ${message.take(80)}" }
             }
         }
     }
@@ -354,6 +361,7 @@ class ProxyWebTransport(
             ProxyTunnelProtocol.OP_CLIENT_OPEN -> {
                 val sessionStr = readRemainingUtf8(buffer)
                 val sessionUuid = parseUuidOrNull(sessionStr)
+                debugLog { "Proxy <- CLIENT_OPEN clientId=$clientId session=${sessionStr.take(64)}" }
                 val conn = ProxiedWebConnection(clientId, this)
                 clients.put(clientId, conn)?.let { old ->
                     old.markClosed()
@@ -362,6 +370,7 @@ class ProxyWebTransport(
                 adapter.onConnect(sessionUuid, conn)
             }
             ProxyTunnelProtocol.OP_CLIENT_CLOSE -> {
+                debugLog { "Proxy <- CLIENT_CLOSE clientId=$clientId" }
                 val conn = clients.remove(clientId) ?: return
                 conn.markClosed()
                 adapter.onDisconnect(conn)
@@ -369,17 +378,25 @@ class ProxyWebTransport(
             ProxyTunnelProtocol.OP_CLIENT_TEXT -> {
                 val conn = clients[clientId] ?: return
                 val text = readRemainingUtf8(buffer)
+                debugLog { "Proxy <- CLIENT_TEXT clientId=$clientId len=${text.length}" }
                 adapter.onText(conn, text)
             }
             ProxyTunnelProtocol.OP_CLIENT_BINARY -> {
                 val conn = clients[clientId] ?: return
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
+                debugLog { "Proxy <- CLIENT_BINARY clientId=$clientId bytes=${bytes.size}" }
                 adapter.onBinary(conn, bytes)
             }
             else -> {
-                logger.fine("Ignoring unknown tunnel opcode: 0x%02x".format(opcode))
+                debugLog { "Ignoring unknown tunnel opcode: 0x%02x".format(opcode) }
             }
+        }
+    }
+
+    private inline fun debugLog(message: () -> String) {
+        if (plugin.bridgeConfig.debug) {
+            logger.info("[Debug] ${message()}")
         }
     }
 
@@ -397,7 +414,8 @@ class ProxyWebTransport(
                 }
                 return
             }
-            val version = plugin.pluginMeta.version
+            @Suppress("DEPRECATION")
+            val version = plugin.description.version
             val hello = buildString {
                 append("""{"type":"hello","protocol":""")
                 append(ProxyTunnelProtocol.PROTOCOL_VERSION)
@@ -411,6 +429,7 @@ class ProxyWebTransport(
             }
             try {
                 send(hello)
+                debugLog { "Proxy tunnel opened; sent hello (protocol=${ProxyTunnelProtocol.PROTOCOL_VERSION}, serverId=${identity.serverId}, version=$version)" }
             } catch (ex: Exception) {
                 lastError = ex.message
                 logger.warning("Failed to send proxy hello: ${ex.message}")

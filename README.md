@@ -17,13 +17,13 @@
 - Configurable overlay in web
 - Voice chat available in 3 clicks for players
 - Plug-n-play for small server admins - **without additional ports forwarding, webserver and ssl configuration**
-- Fully self-hostable for advanced setups and big servers
+- Fully self-hostable for advanced setups and big servers - **no limits, max webpage configurability**
 - Always free and open source under GPL-3 license
 
 ### Supported server platforms
 - [Papermc](https://papermc.io/software/paper/)
 - [Folia](https://papermc.io/software/folia/)
-- [Spigot](https://www.spigotmc.org/) with a [lot of limitations](#running-on-spigot)
+- [Spigot](https://www.spigotmc.org/)
 
 ### Showcase
 
@@ -38,7 +38,7 @@
 
 ### Permissions
 
-- `voicebridge.admin` - access to `/voicebridge` (`/vb`, `/voicewebbridge`, `/vwb`) admin commands
+- `voicebridge.admin` - access to `/voicewebbridge` admin commands
 - Player command `/mic` does not require any permission
 
 ### Admin commands
@@ -49,11 +49,11 @@ Aliases: `/vb`, `/voicewebbridge`, `/vwb`
 - `/voicebridge status` - show bridge status, SVC/PV readiness, web transport state, and metrics
 - `/voicebridge players` - list active voice sessions (`[SVC]`, `[PV]`, `[SVC+PV]`, `[WEB]`)
 - `/voicebridge reload` - reload `config.yml` (restarts web transport if web settings changed)
-- `/voicebridge debug [on|off]` - toggle debug logging (runtime only)
+- `/voicebridge debug [on|off]` - toggle debug logging
 
 ### User commands
 
-- `/mic` (alias: `/vmic`) - toggle your browser voice microphone On/Off, or resend your personal voice chat link if not connected yet
+- `/mic` - toggle your browser voice microphone On/Off, or resend your personal voice chat link if not connected yet
 
 
 ###  Looking for affordable and powerful Server hosting?

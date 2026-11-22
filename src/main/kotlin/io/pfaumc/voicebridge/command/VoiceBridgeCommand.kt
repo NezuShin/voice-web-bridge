@@ -1,277 +1,193 @@
 package io.pfaumc.voicebridge.command
 
-import com.mojang.brigadier.Command
-import com.mojang.brigadier.arguments.StringArgumentType
-import com.mojang.brigadier.context.CommandContext
-import com.mojang.brigadier.tree.LiteralCommandNode
-import io.papermc.paper.command.brigadier.CommandSourceStack
-import io.papermc.paper.command.brigadier.Commands
 import io.pfaumc.voicebridge.BridgeMetrics
 import io.pfaumc.voicebridge.VoiceBridgePlugin
+import io.pfaumc.voicebridge.config.Message
+import io.pfaumc.voicebridge.session.BridgeSession
 import io.pfaumc.voicebridge.session.ModType
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.JoinConfiguration
-import net.kyori.adventure.text.event.ClickEvent
-import net.kyori.adventure.text.event.HoverEvent
-import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.format.TextDecoration
-import org.bukkit.entity.Player
+import org.bukkit.command.Command
+import org.bukkit.command.CommandExecutor
+import org.bukkit.command.CommandSender
+import org.bukkit.command.TabCompleter
+import org.bukkit.util.StringUtil
+import java.util.UUID
+import java.util.logging.Level
 
-@Suppress("UnstableApiUsage")
-object VoiceBridgeCommand {
+class VoiceBridgeCommand(private val plugin: VoiceBridgePlugin) : CommandExecutor, TabCompleter {
 
-    private val ACCENT = NamedTextColor.GOLD
-    private val LABEL = NamedTextColor.GRAY
-    private val VALUE = NamedTextColor.WHITE
-    private val CMD = NamedTextColor.YELLOW
-    private val SVC_COLOR = NamedTextColor.AQUA
-    private val PV_COLOR = NamedTextColor.LIGHT_PURPLE
-    private val DUAL_COLOR = NamedTextColor.GREEN
+    override fun onCommand(
+        sender: CommandSender,
+        command: Command,
+        label: String,
+        args: Array<out String>
+    ): Boolean {
+        if (!sender.hasPermission(ADMIN_PERMISSION)) {
+            Message.insufficient_permissions.send(sender)
+            return true
+        }
 
-    fun buildCommand(plugin: VoiceBridgePlugin): LiteralCommandNode<CommandSourceStack> {
-        return Commands.literal("voicebridge")
-            .requires { it.sender.hasPermission("voicebridge.admin") }
-            .executes { showHelp(it) }
-            .then(
-                Commands.literal("status")
-                    .executes { showStatus(it, plugin) }
-            )
-            .then(
-                Commands.literal("players")
-                    .executes { showPlayers(it, plugin) }
-            )
-            .then(
-                Commands.literal("reload")
-                    .executes { reloadConfig(it, plugin) }
-            )
-            .then(
-                Commands.literal("debug")
-                    .executes { toggleDebug(it, plugin, null) }
-                    .then(
-                        Commands.argument("value", StringArgumentType.word())
-                            .suggests { _, builder ->
-                                builder.suggest("on").suggest("off").buildFuture()
-                            }
-                            .executes { ctx ->
-                                toggleDebug(ctx, plugin, StringArgumentType.getString(ctx, "value"))
-                            }
-                    )
-            )
-            .build()
-    }
-
-    fun buildWebControlCommand(
-        plugin: VoiceBridgePlugin,
-        name: String,
-        action: String,
-        label: String
-    ): LiteralCommandNode<CommandSourceStack> {
-        return Commands.literal(name)
-            .executes { ctx ->
-                val player = ctx.source.sender as? Player
-                if (player == null) {
-                    ctx.source.sender.sendMessage(Component.text("This command can only be used by a player.", NamedTextColor.RED))
-                    return@executes Command.SINGLE_SUCCESS
-                }
-                val web = plugin.webAdapter
-                if (web == null) {
-                    player.sendMessage(Component.text("Web voice chat is disabled on this server.", NamedTextColor.RED))
-                    return@executes Command.SINGLE_SUCCESS
-                }
-                if (web.triggerControlFromCommand(player, action)) {
-                    player.sendActionBar(
-                        Component.text("[Voice] ", ACCENT)
-                            .append(Component.text("$label toggled", NamedTextColor.GREEN))
-                    )
-                } else {
-                    player.sendMessage(
-                        Component.text("[Voice] ", ACCENT)
-                            .append(Component.text("Your browser voice page is not connected yet.", NamedTextColor.YELLOW))
-                    )
-                }
-                Command.SINGLE_SUCCESS
-            }
-            .build()
-    }
-
-    private fun header(text: String): Component =
-        Component.text("══ ", ACCENT)
-            .append(Component.text(text, ACCENT, TextDecoration.BOLD))
-            .append(Component.text(" ══", ACCENT))
-
-    private fun stat(label: String, value: Any): Component =
-        Component.text("  $label: ", LABEL)
-            .append(Component.text(value.toString(), VALUE))
-
-    private fun cmdLine(cmd: String, description: String, vararg args: String): Component {
-        val line = Component.text("  ", LABEL)
-            .append(
-                Component.text(cmd, CMD)
-                    .clickEvent(ClickEvent.suggestCommand(cmd))
-                    .hoverEvent(HoverEvent.showText(Component.text("Click to paste", LABEL)))
-            )
         if (args.isEmpty()) {
-            return line.append(Component.text(" — $description", LABEL))
+            Message.help.send(sender)
+            return true
         }
-        val argsComponent = args.fold(Component.empty()) { acc, arg ->
-            acc.append(Component.text(" ", LABEL))
-                .append(
-                    Component.text(arg, NamedTextColor.AQUA)
-                        .clickEvent(ClickEvent.suggestCommand("$cmd $arg"))
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to paste \"$cmd $arg\"", LABEL)))
-                )
+
+        when (args[0].lowercase()) {
+            "status" -> showStatus(sender)
+            "players" -> showPlayers(sender)
+            "reload" -> reloadConfig(sender)
+            "debug" -> toggleDebug(sender, args.getOrNull(1))
+            else -> Message.help.send(sender)
         }
-        return line.append(argsComponent).append(Component.text(" — $description", LABEL))
+        return true
     }
 
-    private fun modTag(session: io.pfaumc.voicebridge.session.BridgeSession): Component {
-        if (session.isDualMod()) {
-            return Component.text("[SVC+PV]", DUAL_COLOR, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text("Dual-mod (both installed)", DUAL_COLOR)))
-        }
-        return when (session.modType) {
-            ModType.SIMPLE_VOICE_CHAT -> Component.text("[SVC]", SVC_COLOR)
-                .hoverEvent(HoverEvent.showText(Component.text("Simple Voice Chat", SVC_COLOR)))
-            ModType.PLASMO_VOICE -> Component.text("[PV]", PV_COLOR)
-                .hoverEvent(HoverEvent.showText(Component.text("Plasmo Voice", PV_COLOR)))
+    override fun onTabComplete(
+        sender: CommandSender,
+        command: Command,
+        label: String,
+        args: Array<out String>
+    ): List<String> {
+        if (!sender.hasPermission(ADMIN_PERMISSION)) return emptyList()
+
+        return when (args.size) {
+            1 -> SUBCOMMANDS.filter { StringUtil.startsWithIgnoreCase(it, args[0]) }
+            2 -> if (args[0].equals("debug", ignoreCase = true)) {
+                DEBUG_VALUES.filter { StringUtil.startsWithIgnoreCase(it, args[1]) }
+            } else {
+                emptyList()
+            }
+            else -> emptyList()
         }
     }
 
-    private fun showStatus(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
+    private fun showStatus(sender: CommandSender) {
         val debug = plugin.bridgeConfig.debug
-        val webStatus = plugin.webAdapter?.statusSummary() ?: "disabled"
+        val webAdapter = plugin.webAdapter
         val svcReady = plugin.audioRelay.svcAdapter?.isApiReady == true
         val pvReady = plugin.audioRelay.pvAdapter != null
-        ctx.source.sender.sendMessage(
-            Component.join(
-                JoinConfiguration.newlines(),
-                header("Voice Web Bridge Status"),
-                stat("Active sessions", BridgeMetrics.activeSessions.get()),
-                stat("SVC API", if (svcReady) "ready" else "NOT READY"),
-                stat("PV Addon", if (pvReady) "ready" else "NOT READY"),
-                stat("SVC → PV frames", BridgeMetrics.svcToPlasmoFrames.get()),
-                stat("PV → SVC frames", BridgeMetrics.plasmoToSvcFrames.get()),
-                stat("Dropped frames", BridgeMetrics.droppedFrames.get()),
-                stat("Transcoded frames", BridgeMetrics.transcodingCount.get()),
-                stat("Web transport", webStatus),
-                stat("Web sessions", BridgeMetrics.webActiveSessions.get()),
-                stat("Web → Game frames", BridgeMetrics.webToGameFrames.get()),
-                stat("Game → Web frames", BridgeMetrics.gameToWebFrames.get()),
-                Component.text("  Debug: ", LABEL)
-                    .append(
-                        Component.text(
-                            if (debug) "enabled" else "disabled",
-                            if (debug) NamedTextColor.GREEN else NamedTextColor.RED
-                        )
-                    )
-                    .hoverEvent(HoverEvent.showText(Component.text("Click to toggle", LABEL)))
-                    .clickEvent(ClickEvent.runCommand("/voicebridge debug")),
-                stat("Passthrough", plugin.bridgeConfig.passthrough),
+
+        val statusSender = Message.status
+            .replace(
+                "{active_sessions}" to BridgeMetrics.activeSessions.get(),
+                "{svc_to_pv_frames}" to BridgeMetrics.svcToPlasmoFrames.get(),
+                "{pv_to_svc_frames}" to BridgeMetrics.plasmoToSvcFrames.get(),
+                "{dropped_frames}" to BridgeMetrics.droppedFrames.get(),
+                "{transcoded_frames}" to BridgeMetrics.transcodingCount.get(),
+                "{web_sessions}" to BridgeMetrics.webActiveSessions.get(),
+                "{web_to_game_frames}" to BridgeMetrics.webToGameFrames.get(),
+                "{game_to_web_frames}" to BridgeMetrics.gameToWebFrames.get(),
+                "{passthrough}" to plugin.bridgeConfig.passthrough
             )
-        )
-        return Command.SINGLE_SUCCESS
+            .replaceRaw(
+                "{svc_api}" to (if (svcReady) Message.status_ready else Message.status_not_ready).asString(),
+                "{pv_addon}" to (if (pvReady) Message.status_ready else Message.status_not_ready).asString(),
+                "{debug}" to (if (debug) Message.status_enabled else Message.status_disabled).asString()
+            )
+
+        if (webAdapter != null && plugin.bridgeConfig.webEnabled) {
+            statusSender.replace("{web_transport}" to webAdapter.statusSummary())
+        } else {
+            statusSender.replaceRaw("{web_transport}" to Message.status_web_disabled.asString())
+        }
+
+        statusSender.send(sender)
     }
 
-    private fun showPlayers(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
+    private fun showPlayers(sender: CommandSender) {
         val sessions = plugin.sessionManager.getAllSessions()
         val webConnected = plugin.webAdapter?.getConnectedWebPlayers().orEmpty()
         if (sessions.isEmpty() && webConnected.isEmpty()) {
-            ctx.source.sender.sendMessage(Component.text("No active Voice Web Bridge sessions.", LABEL))
-            return Command.SINGLE_SUCCESS
+            Message.players_empty.send(sender)
+            return
         }
+
         val byUuid = sessions.associateBy { it.playerUuid }
-        val allUuids = linkedSetOf<java.util.UUID>()
+        val allUuids = linkedSetOf<UUID>()
         sessions.forEach { allUuids.add(it.playerUuid) }
         webConnected.keys.forEach { allUuids.add(it) }
 
-        val lines = mutableListOf(header("Voice Web Bridge Players (${allUuids.size})"))
+        Message.players_header
+            .replace("{count}" to allUuids.size)
+            .send(sender)
+
         for (uuid in allUuids) {
             val session = byUuid[uuid]
             val isWeb = webConnected.containsKey(uuid)
             val name = session?.playerName ?: webConnected[uuid] ?: uuid.toString()
 
-            var line = Component.text("  ", LABEL)
-                .append(
-                    Component.text(name, VALUE)
-                        .hoverEvent(HoverEvent.showText(Component.text("UUID: $uuid", LABEL)))
-                )
-            if (session != null) {
-                line = line.append(Component.text(" ", LABEL)).append(modTag(session))
-            }
-            if (isWeb) {
-                line = line.append(Component.text(" ", LABEL))
-                    .append(
-                        Component.text("[WEB]", NamedTextColor.YELLOW)
-                            .hoverEvent(HoverEvent.showText(Component.text("Browser voice client connected", NamedTextColor.YELLOW)))
-                    )
+            val tags = buildString {
+                if (session != null) {
+                    append(modTag(session))
+                }
+                if (isWeb) {
+                    append(Message.players_tag_web.asString())
+                }
             }
             val active = (session?.active == true) || isWeb
-            val activeIndicator = if (active) {
-                Component.text(" ●", NamedTextColor.GREEN)
-                    .hoverEvent(HoverEvent.showText(Component.text("Active", NamedTextColor.GREEN)))
+            val statusIcon = if (active) {
+                Message.players_active.asString()
             } else {
-                Component.text(" ○", NamedTextColor.DARK_GRAY)
-                    .hoverEvent(HoverEvent.showText(Component.text("Inactive", NamedTextColor.DARK_GRAY)))
+                Message.players_inactive.asString()
             }
-            lines += line.append(activeIndicator)
-        }
-        ctx.source.sender.sendMessage(Component.join(JoinConfiguration.newlines(), lines))
-        return Command.SINGLE_SUCCESS
-    }
 
-    private fun reloadConfig(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin): Int {
-        val webRestarted = plugin.reloadBridgeConfig()
-        val message = when {
-            webRestarted && plugin.bridgeConfig.webEnabled -> Component.text("✔ ", NamedTextColor.GREEN)
-                .append(Component.text("Config reloaded — web voice transport restarted: ", VALUE))
-                .append(
-                    Component.text(
-                        plugin.webAdapter?.statusSummary() ?: "unknown",
-                        NamedTextColor.AQUA
-                    )
+            Message.players_entry
+                .replace(
+                    "{player}" to name,
+                    "{uuid}" to uuid
                 )
-                .append(Component.text(".", VALUE))
-            webRestarted -> Component.text("✔ ", NamedTextColor.GREEN)
-                .append(Component.text("Config reloaded — web voice transport stopped.", VALUE))
-            else -> Component.text("✔ ", NamedTextColor.GREEN)
-                .append(Component.text("Config reloaded.", VALUE))
+                .replaceRaw(
+                    "{tags}" to tags,
+                    "{status}" to statusIcon
+                )
+                .send(sender)
         }
-        ctx.source.sender.sendMessage(message)
-        return Command.SINGLE_SUCCESS
     }
 
-    private fun toggleDebug(ctx: CommandContext<CommandSourceStack>, plugin: VoiceBridgePlugin, value: String?): Int {
+    private fun modTag(session: BridgeSession): String {
+        if (session.isDualMod()) {
+            return Message.players_tag_dual.asString()
+        }
+        return when (session.modType) {
+            ModType.SIMPLE_VOICE_CHAT -> Message.players_tag_svc.asString()
+            ModType.PLASMO_VOICE -> Message.players_tag_pv.asString()
+        }
+    }
+
+    private fun reloadConfig(sender: CommandSender) {
+        try {
+            val webRestarted = plugin.reloadBridgeConfig()
+            when {
+                webRestarted && plugin.bridgeConfig.webEnabled -> {
+                    Message.reload_complete_web_restarted
+                        .replace("{status}" to (plugin.webAdapter?.statusSummary() ?: "unknown"))
+                        .send(sender)
+                }
+                webRestarted -> Message.reload_complete_web_stopped.send(sender)
+                else -> Message.reload_complete.send(sender)
+            }
+        } catch (ex: Exception) {
+            Message.reload_failed.send(sender)
+            plugin.logger.log(Level.SEVERE, "Failed to reload Voice Web Bridge config", ex)
+        }
+    }
+
+    private fun toggleDebug(sender: CommandSender, value: String?) {
         val enabled = when (value?.lowercase()) {
             "on", "true" -> true
             "off", "false" -> false
             else -> !plugin.bridgeConfig.debug
         }
-        ctx.source.sender.sendMessage(
-            Component.text(if (enabled) "✔ " else "✘ ", if (enabled) NamedTextColor.GREEN else NamedTextColor.RED)
-                .append(Component.text("Debug logging ", VALUE))
-                .append(
-                    Component.text(
-                        if (enabled) "enabled" else "disabled",
-                        if (enabled) NamedTextColor.GREEN else NamedTextColor.RED,
-                        TextDecoration.BOLD
-                    )
-                )
-                .append(Component.text(" (runtime only)", LABEL))
-        )
-        return Command.SINGLE_SUCCESS
+        plugin.bridgeConfig.debug = enabled
+        if (enabled) {
+            Message.debug_enabled.send(sender)
+        } else {
+            Message.debug_disabled.send(sender)
+        }
     }
 
-    private fun showHelp(ctx: CommandContext<CommandSourceStack>): Int {
-        ctx.source.sender.sendMessage(
-            Component.join(
-                JoinConfiguration.newlines(),
-                header("Voice Web Bridge Commands"),
-                cmdLine("/vb status", "Show bridge status and metrics"),
-                cmdLine("/vb players", "List connected players and their voice mod"),
-                cmdLine("/vb reload", "Reload configuration"),
-                cmdLine("/vb debug", "Toggle debug logging", "on", "off"),
-            )
-        )
-        return Command.SINGLE_SUCCESS
+    companion object {
+        private const val ADMIN_PERMISSION = "voicebridge.admin"
+        private val SUBCOMMANDS = listOf("status", "players", "reload", "debug")
+        private val DEBUG_VALUES = listOf("on", "off")
     }
 }

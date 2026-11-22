@@ -1,0 +1,58 @@
+insufficient_permissions: "<red>У вас нет прав на использование этой команды!"
+player_only: "<red>Эта команда доступна только игрокам."
+
+help:
+  - "<reset><gray>----------<#008f9a>Помощь по Voice Web Bridge<reset><gray>----------"
+  - "<reset><#08c0c2><hover:show_text:'<gray>Нажмите, чтобы вставить'><click:suggest_command:'/vb status'>/vb status</click></hover> <#008f9a>показать статус и метрики моста"
+  - "<reset><#08c0c2><hover:show_text:'<gray>Нажмите, чтобы вставить'><click:suggest_command:'/vb players'>/vb players</click></hover> <#008f9a>список подключённых игроков и их голосовой мод"
+  - "<reset><#08c0c2><hover:show_text:'<gray>Нажмите, чтобы вставить'><click:suggest_command:'/vb reload'>/vb reload</click></hover> <#008f9a>перезагрузить конфигурацию и сообщения"
+  - "<reset><#08c0c2><hover:show_text:'<gray>Нажмите, чтобы вставить'><click:suggest_command:'/vb debug '>/vb debug on/off</click></hover> <#008f9a>переключить отладочное логирование"
+  - "<reset><#08c0c2><hover:show_text:'<gray>Нажмите, чтобы вставить'><click:suggest_command:'/mic'>/mic</click></hover> <#008f9a>включить/выключить микрофон в веб-чате"
+
+status:
+  - "<reset><gray>---------<#008f9a>Статус Voice Web Bridge<reset><gray>---------"
+  - "<reset><#08c0c2>Активные сессии: <#008f9a>{active_sessions}"
+  - "<reset><#08c0c2>SVC API: {svc_api}"
+  - "<reset><#08c0c2>PV аддон: {pv_addon}"
+  - "<reset><#08c0c2>Кадры SVC → PV: <#008f9a>{svc_to_pv_frames}"
+  - "<reset><#08c0c2>Кадры PV → SVC: <#008f9a>{pv_to_svc_frames}"
+  - "<reset><#08c0c2>Пропущенные кадры: <#008f9a>{dropped_frames}"
+  - "<reset><#08c0c2>Перекодированные кадры: <#008f9a>{transcoded_frames}"
+  - "<reset><#08c0c2>Веб-транспорт: <#008f9a>{web_transport}"
+  - "<reset><#08c0c2>Веб-сессии: <#008f9a>{web_sessions}"
+  - "<reset><#08c0c2>Кадры Web → Игра: <#008f9a>{web_to_game_frames}"
+  - "<reset><#08c0c2>Кадры Игра → Web: <#008f9a>{game_to_web_frames}"
+  - "<reset><hover:show_text:'<gray>Нажмите, чтобы переключить'><click:run_command:'/voicebridge debug'><#08c0c2>Отладка: {debug}</click></hover>"
+  - "<reset><#08c0c2>Passthrough: <#008f9a>{passthrough}"
+
+status_ready: "<#008f9a>готов"
+status_not_ready: "<red>НЕ ГОТОВ"
+status_enabled: "<#008f9a>включено"
+status_disabled: "<red>отключено"
+status_web_disabled: "<red>отключено"
+
+players_empty: "<#08c0c2>Нет активных сессий Voice Web Bridge."
+players_header: "<reset><gray>-------<#008f9a>Игроки Voice Web Bridge ({count})<reset><gray>-------"
+players_entry: "<reset>  <hover:show_text:'<gray>UUID: {uuid}'><#08c0c2>{player}</hover>{tags}{status}"
+players_tag_svc: " <hover:show_text:'<#08c0c2>Simple Voice Chat'><#08c0c2>[SVC]</hover>"
+players_tag_pv: " <hover:show_text:'<#008f9a>Plasmo Voice'><#008f9a>[PV]</hover>"
+players_tag_dual: " <hover:show_text:'<#08c0c2>Оба мода (SVC и PV)'><#08c0c2><bold>[SVC+PV]</bold></hover>"
+players_tag_web: " <hover:show_text:'<#008f9a>Подключён браузерный голосовой клиент'><#008f9a>[WEB]</hover>"
+players_active: " <hover:show_text:'<#08c0c2>Активен'><#08c0c2>●</hover>"
+players_inactive: " <hover:show_text:'<gray>Неактивен'><gray>○</hover>"
+
+reload_complete: "<#008f9a>Конфигурация перезагружена!"
+reload_complete_web_restarted: "<#008f9a>Конфигурация перезагружена — веб-транспорт перезапущен: <#08c0c2>{status}"
+reload_complete_web_stopped: "<#008f9a>Конфигурация перезагружена — веб-транспорт остановлен."
+reload_failed: "<red>Перезагрузка провалена! В консоли написана детальная ошибка."
+
+debug_enabled: "<#08c0c2>Отладка <#008f9a>включена"
+debug_disabled: "<#08c0c2>Отладка <red>отключена"
+
+web_disabled: "<red>Веб-голосовой чат отключён на этом сервере."
+web_link: "<reset><#008f9a>Голосовой чат доступен для вас через браузер: <hover:show_text:'<gray>Нажмите, чтобы открыть страницу голосового чата'><click:open_url:'{link}'><#08c0c2><underlined>клик</underlined></click></hover>"
+web_not_connected: "<red>Страница голосового чата в браузере ещё не подключена."
+
+mic_toggled: "<#008f9a>Микрофон переключён"
+mic_state_on: "<#008f9a>Микрофон: <#08c0c2>ВКЛ"
+mic_state_off: "<#008f9a>Микрофон: <red>ВЫКЛ"

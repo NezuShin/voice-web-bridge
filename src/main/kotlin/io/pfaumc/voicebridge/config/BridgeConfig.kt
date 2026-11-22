@@ -1,7 +1,11 @@
 package io.pfaumc.voicebridge.config
 
+import io.pfaumc.voicebridge.config.updater.ConfigUpdater
+import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.plugin.Plugin
 import java.io.File
+import java.io.IOException
 import java.util.logging.Logger
 
 enum class WebMode(val configName: String) {
@@ -17,8 +21,10 @@ enum class WebMode(val configName: String) {
 }
 
 data class BridgeConfig(
+    val language: String = "en_US",
+    val allowConfigUpdates: Boolean = true,
     val enabled: Boolean = true,
-    val debug: Boolean = false,
+    @Volatile var debug: Boolean = false,
     val defaultDistance: Double = 48.0,
     val whisperMultiplier: Double = 0.33,
     val maxDistance: Double = 128.0,
@@ -42,16 +48,29 @@ data class BridgeConfig(
         private val logger = Logger.getLogger("VoiceBridge")
         const val DEFAULT_PROXY_URL = "https://voicechat.nezushin.ru"
 
-        fun load(dataFolder: File): BridgeConfig {
+        fun load(plugin: Plugin): BridgeConfig {
+            val dataFolder = plugin.dataFolder
             val configFile = File(dataFolder, "config.yml")
 
+            var yaml: FileConfiguration
             if (!configFile.exists()) {
                 dataFolder.mkdirs()
-                configFile.writeText(DEFAULT_CONFIG)
+                plugin.saveDefaultConfig()
                 logger.info("Created default config at ${configFile.absolutePath}")
-            }
+                yaml = YamlConfiguration.loadConfiguration(configFile)
+            } else {
+                yaml = YamlConfiguration.loadConfiguration(configFile)
+                migrateLegacyWebMode(yaml)
 
-            val yaml = YamlConfiguration.loadConfiguration(configFile)
+                if (yaml.getBoolean("config.allow-config-updates", true)) {
+                    try {
+                        ConfigUpdater.update(plugin, "config.yml", configFile, yaml, "worlds")
+                        yaml = YamlConfiguration.loadConfiguration(configFile)
+                    } catch (ex: IOException) {
+                        logger.warning("Failed to auto-update config.yml: ${ex.message}")
+                    }
+                }
+            }
 
             val worldOverrides = mutableMapOf<String, Double>()
             val worldsSection = yaml.getConfigurationSection("worlds")
@@ -73,6 +92,8 @@ data class BridgeConfig(
             }
 
             return BridgeConfig(
+                language = (yaml.getString("language", "en_US") ?: "en_US").trim().ifEmpty { "en_US" },
+                allowConfigUpdates = yaml.getBoolean("config.allow-config-updates", true),
                 enabled = yaml.getBoolean("bridge.enabled", true),
                 debug = yaml.getBoolean("bridge.debug", false),
                 defaultDistance = yaml.getDouble("proximity.default-distance", 48.0),
@@ -99,71 +120,15 @@ data class BridgeConfig(
             )
         }
 
-        private val DEFAULT_CONFIG = """
-            # Voice Web Bridge Configuration
-            bridge:
-              enabled: true
-              debug: false
-
-            proximity:
-              # Default voice distance in blocks
-              default-distance: 48.0
-              # Whisper distance = normal distance * this multiplier
-              whisper-multiplier: 0.33
-              # Maximum allowed voice distance
-              max-distance: 128.0
-
-            audio:
-              # Pass Opus frames through without re-encoding (recommended, lowest latency)
-              passthrough: true
-              # Force decode and re-encode all frames (higher CPU, use only if codec mismatch)
-              force-transcode: false
-              # Smooth out bursty Simple Voice Chat frame delivery before forwarding to Plasmo
-              # Voice. Holds a small lead of frames per speaker and releases them at a steady 20ms
-              # cadence so PV clients don't underflow their jitter buffer and crackle.
-              repacing: true
-              # Frames to pre-buffer before draining (each frame is 20ms). Higher = smoother under
-              # jitter but more latency. 2 = ~40ms added.
-              jitter-frames: 2
-
-            web:
-              # Enable the browser voice client
-              enabled: true
-              # Transport mode:
-              #   "proxy"       - (default, plug-and-play) connects outbound over a single WebSocket
-              #                   to a hosted relay — no open web ports or Nginx required
-              #   "self-hosted" - runs an embedded WebSocket server locally behind your own Nginx
-              mode: proxy
-
-              # --- Proxy mode settings (used when mode: proxy) ---
-              proxy:
-                # Proxy endpoint (supports ws://, wss://, http://, or https://; defaults path to /bridge-ws)
-                url: "$DEFAULT_PROXY_URL"
-                # Optional stable server id (6-32 chars: a-z, A-Z, 0-9, _, -).
-                # Leave blank to auto-generate and persist one in proxy-identity.properties.
-                server-id: ""
-                # Optional link override. Leave blank to use the public URL sent by the proxy.
-                # Supports {serverId} and {uuid} placeholders.
-                link-template: ""
-                # Initial delay in seconds before reconnecting after a tunnel disconnect
-                reconnect-delay-seconds: 5
-
-              # --- Self-hosted mode settings (used when mode: self-hosted) ---
-              # Bind address. 127.0.0.1 means only a local Nginx proxy can reach it.
-              host: 127.0.0.1
-              port: 8090
-              # Link sent to players after joining. {uuid} is replaced with the session id.
-              link-template: "https://bla-bla.com/voicechat.html?id={uuid}"
-
-              # Delay in seconds before the link message is sent after joining
-              link-delay-seconds: 5
-
-            # Per-world distance overrides (optional)
-            # worlds:
-            #   world_nether:
-            #     default-distance: 24.0
-            #   world_the_end:
-            #     default-distance: 64.0
-        """.trimIndent()
+        /**
+         * Preserves self-hosted mode for pre-proxy configs before [ConfigUpdater] writes
+         * the default `web.mode: proxy` key.
+         */
+        private fun migrateLegacyWebMode(yaml: FileConfiguration) {
+            if (yaml.contains("web.mode")) return
+            if (yaml.contains("web.host") || yaml.contains("web.port") || yaml.contains("web.link-template")) {
+                yaml.set("web.mode", WebMode.SELF_HOSTED.configName)
+            }
+        }
     }
 }

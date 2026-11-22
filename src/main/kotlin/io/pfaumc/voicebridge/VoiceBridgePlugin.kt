@@ -1,14 +1,16 @@
 package io.pfaumc.voicebridge
 
-import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import io.pfaumc.voicebridge.adapter.PvAdapter
 import io.pfaumc.voicebridge.adapter.SvcAdapter
+import io.pfaumc.voicebridge.command.MicCommand
 import io.pfaumc.voicebridge.command.VoiceBridgeCommand
 import io.pfaumc.voicebridge.config.BridgeConfig
+import io.pfaumc.voicebridge.config.Message
 import io.pfaumc.voicebridge.relay.AudioRelay
 import io.pfaumc.voicebridge.session.ModType
 import io.pfaumc.voicebridge.session.SessionManager
 import io.pfaumc.voicebridge.spatial.SpatialMapper
+import io.pfaumc.voicebridge.util.SchedulerUtil
 import io.pfaumc.voicebridge.web.WebAdapter
 import kotlinx.coroutines.*
 import org.bstats.bukkit.Metrics
@@ -43,8 +45,9 @@ class VoiceBridgePlugin : JavaPlugin() {
     override fun onEnable() {
         instance = this
 
-        // Load config
-        bridgeConfig = BridgeConfig.load(dataFolder)
+        // Load config and messages
+        bridgeConfig = BridgeConfig.load(this)
+        Message.load(this, bridgeConfig.language, bridgeConfig.allowConfigUpdates)
         if (!bridgeConfig.enabled) {
             logger.info("Voice Web Bridge is disabled in config")
             return
@@ -93,7 +96,7 @@ class VoiceBridgePlugin : JavaPlugin() {
             }
         }
 
-        // Register commands via Brigadier
+        // Register commands
         registerCommands()
 
         // Register bStats custom charts
@@ -107,26 +110,31 @@ class VoiceBridgePlugin : JavaPlugin() {
         webAdapter?.stop()
         svcAdapter?.shutdown()
         pvAdapter?.shutdown()
-        sessionManager.clear()
+        if (::sessionManager.isInitialized) {
+            sessionManager.clear()
+        }
+        SchedulerUtil.cancelAllTasks(this)
         scope.cancel()
         logger.info("Voice Web Bridge disabled")
     }
 
     /**
-     * Reloads config.yml and applies the new values at runtime.
+     * Reloads config.yml and language files and applies the new values at runtime.
      *
      * @return true if the web voice server was (re)started because web settings changed
      */
     fun reloadBridgeConfig(): Boolean {
-        bridgeConfig = BridgeConfig.load(dataFolder)
+        bridgeConfig = BridgeConfig.load(this)
+        Message.load(this, bridgeConfig.language, bridgeConfig.allowConfigUpdates)
         spatialMapper.config = bridgeConfig
+        audioRelay.config = bridgeConfig
         val webRestarted = webAdapter?.reconfigure(bridgeConfig) ?: false
         logger.info("Voice Web Bridge config reloaded")
         return webRestarted
     }
 
     private fun setupMetrics() {
-        metrics = Metrics(this, 29717)
+        metrics = Metrics(this, 35526)
 
         // Player counts
         metrics.addCustomChart(SingleLineChart("svc_players") {
@@ -139,23 +147,25 @@ class VoiceBridgePlugin : JavaPlugin() {
             sessionManager.getAllSessions().count { it.isDualMod() }
         })
 
-        // Distribution of connected players across the two mods.
-        // Dual-mod players are counted once in "Both mods" to avoid double counting.
+        // Distribution of connected players across voice clients.
+        // Dual-mod players are counted once in "Both mods"; web-only players in "Web".
         metrics.addCustomChart(AdvancedPie("voice_mod_distribution") {
             val dual = sessionManager.getAllSessions().count { it.isDualMod() }
             val svcOnly = sessionManager.getSessionsByMod(ModType.SIMPLE_VOICE_CHAT).size - dual
             val pvOnly = sessionManager.getSessionsByMod(ModType.PLASMO_VOICE).size - dual
+            val webOnly = webAdapter?.getConnectedWebPlayers()?.keys?.count { !sessionManager.isRegistered(it) } ?: 0
             mutableMapOf(
                 "Simple Voice Chat" to svcOnly,
                 "Plasmo Voice" to pvOnly,
-                "Both mods" to dual
+                "Both mods" to dual,
+                "Web" to webOnly
             )
         })
         metrics.addCustomChart(SingleLineChart("bridged_sessions") {
             BridgeMetrics.activeSessions.get()
         })
         metrics.addCustomChart(SingleLineChart("web_players") {
-            BridgeMetrics.webActiveSessions.get()
+            webAdapter?.getConnectedWebPlayers()?.size ?: 0
         })
 
         // Config values
@@ -168,18 +178,17 @@ class VoiceBridgePlugin : JavaPlugin() {
     }
 
     private fun registerCommands() {
-        lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
-            event.registrar().register(
-                VoiceBridgeCommand.buildCommand(this),
-                "Voice Web Bridge admin commands",
-                listOf("vb", "voicewebbridge", "vwb")
-            )
-            event.registrar().register(
-                VoiceBridgeCommand.buildWebControlCommand(this, "mic", "mic_toggle", "Microphone"),
-                "Toggle web voice microphone On/Off",
-                listOf("vmic")
-            )
-        }
+        val adminCommand = VoiceBridgeCommand(this)
+        getCommand("voicebridge")?.apply {
+            setExecutor(adminCommand)
+            tabCompleter = adminCommand
+        } ?: logger.warning("Command 'voicebridge' is missing from plugin.yml")
+
+        val micCommand = MicCommand(this)
+        getCommand("mic")?.apply {
+            setExecutor(micCommand)
+            tabCompleter = micCommand
+        } ?: logger.warning("Command 'mic' is missing from plugin.yml")
     }
 
     private fun initSvcAdapter(): Boolean {

@@ -63,7 +63,7 @@ class WebVoiceServer(
         if (conn == null) {
             logger.warning("Web voice server error: ${ex.message}")
         } else {
-            logger.fine("Web voice connection error: ${ex.message}")
+            adapter.debugLog { "Web voice connection error: ${ex.message}" }
         }
     }
 

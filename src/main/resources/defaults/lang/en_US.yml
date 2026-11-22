@@ -1,0 +1,67 @@
+insufficient_permissions: <red>Insufficient permissions!
+player_only: <red>This command can only be used by a player.
+
+help:
+- <reset><gray>------------<#008f9a>Voice Web Bridge help<reset><gray>------------
+- <reset><#08c0c2><hover:show_text:'<gray>Click to paste'><click:suggest_command:'/vb
+  status'>/vb status</click></hover> <#008f9a>show bridge status and metrics
+- <reset><#08c0c2><hover:show_text:'<gray>Click to paste'><click:suggest_command:'/vb
+  players'>/vb players</click></hover> <#008f9a>list connected players and their voice
+  mod
+- <reset><#08c0c2><hover:show_text:'<gray>Click to paste'><click:suggest_command:'/vb
+  reload'>/vb reload</click></hover> <#008f9a>reload configuration and messages
+- <reset><#08c0c2><hover:show_text:'<gray>Click to paste'><click:suggest_command:'/vb
+  debug '>/vb debug on/off</click></hover> <#008f9a>toggle debug logging
+- <reset><#08c0c2><hover:show_text:'<gray>Click to paste'><click:suggest_command:'/mic'>/mic</click></hover>
+  <#008f9a>toggle web voice microphone On/Off
+
+status:
+- <reset><gray>-----------<#008f9a>Voice Web Bridge Status<reset><gray>-----------
+- '<reset><#08c0c2>Active sessions: <#008f9a>{active_sessions}'
+- '<reset><#08c0c2>SVC API: {svc_api}'
+- '<reset><#08c0c2>PV Addon: {pv_addon}'
+- '<reset><#08c0c2>SVC → PV frames: <#008f9a>{svc_to_pv_frames}'
+- '<reset><#08c0c2>PV → SVC frames: <#008f9a>{pv_to_svc_frames}'
+- '<reset><#08c0c2>Dropped frames: <#008f9a>{dropped_frames}'
+- '<reset><#08c0c2>Transcoded frames: <#008f9a>{transcoded_frames}'
+- '<reset><#08c0c2>Web transport: <#008f9a>{web_transport}'
+- '<reset><#08c0c2>Web sessions: <#008f9a>{web_sessions}'
+- '<reset><#08c0c2>Web → Game frames: <#008f9a>{web_to_game_frames}'
+- '<reset><#08c0c2>Game → Web frames: <#008f9a>{game_to_web_frames}'
+- '<reset><hover:show_text:''<gray>Click to toggle''><click:run_command:''/voicebridge
+  debug''><#08c0c2>Debug: {debug}</click></hover>'
+- '<reset><#08c0c2>Passthrough: <#008f9a>{passthrough}'
+
+status_ready: <#008f9a>ready
+status_not_ready: <red>NOT READY
+status_enabled: <#008f9a>enabled
+status_disabled: <red>disabled
+status_web_disabled: <red>disabled
+
+players_empty: <#08c0c2>No active Voice Web Bridge sessions.
+players_header: <reset><gray>--------<#008f9a>Voice Web Bridge Players ({count})<reset><gray>--------
+players_entry: '<reset>  <hover:show_text:''<gray>UUID: {uuid}''><#08c0c2>{player}</hover>{tags}{status}'
+players_tag_svc: ' <hover:show_text:''<#08c0c2>Simple Voice Chat''><#08c0c2>[SVC]</hover>'
+players_tag_pv: ' <hover:show_text:''<#008f9a>Plasmo Voice''><#008f9a>[PV]</hover>'
+players_tag_dual: ' <hover:show_text:''<#08c0c2>Dual-mod (both installed)''><#08c0c2><bold>[SVC+PV]</bold></hover>'
+players_tag_web: ' <hover:show_text:''<#008f9a>Browser voice client connected''><#008f9a>[WEB]</hover>'
+players_active: ' <hover:show_text:''<#08c0c2>Active''><#08c0c2>●</hover>'
+players_inactive: ' <hover:show_text:''<gray>Inactive''><gray>○</hover>'
+
+reload_complete: <#008f9a>Config reloaded!
+reload_complete_web_restarted: '<#008f9a>Config reloaded — web voice transport restarted:
+  <#08c0c2>{status}'
+reload_complete_web_stopped: <#008f9a>Config reloaded — web voice transport stopped.
+reload_failed: <red>Reload failed! Check console to view detailed error
+
+debug_enabled: <#08c0c2>Debug logging <#008f9a>enabled
+debug_disabled: <#08c0c2>Debug logging <red>disabled
+
+web_disabled: <red>Web voice chat is disabled on this server.
+web_link: '<reset><#008f9a>Voice chat available for you via browser: <hover:show_text:''<gray>Click
+  to open the voice chat page''><click:open_url:''{link}''><#08c0c2><underlined>click</underlined></click></hover>'
+web_not_connected: <#08c0c2><red>Your browser voice page is not connected yet.
+
+mic_toggled: <#008f9a>Microphone toggled
+mic_state_on: '<#008f9a>Mic: <#08c0c2>ON'
+mic_state_off: '<#008f9a>Mic: <red>OFF'

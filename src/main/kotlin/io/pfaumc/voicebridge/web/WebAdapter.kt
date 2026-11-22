@@ -5,20 +5,17 @@ import io.pfaumc.voicebridge.VoiceBridgePlugin
 import io.pfaumc.voicebridge.adapter.PvAdapter
 import io.pfaumc.voicebridge.adapter.SvcAdapter
 import io.pfaumc.voicebridge.config.BridgeConfig
+import io.pfaumc.voicebridge.config.Message
 import io.pfaumc.voicebridge.config.WebMode
 import io.pfaumc.voicebridge.session.ModType
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickEvent
-import net.kyori.adventure.text.event.HoverEvent
-import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.format.TextDecoration
+import io.pfaumc.voicebridge.util.PlatformUtil
+import io.pfaumc.voicebridge.util.SchedulerUtil
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.HandlerList
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerDropItemEvent
-import org.bukkit.event.player.PlayerInputEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
@@ -88,6 +85,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     @Volatile
     private var transport: WebTransport? = null
 
+    @Volatile
+    private var inputListener: Listener? = null
+
     // Web settings the currently running transport was started with; null when disabled.
     // Compared on config reload to decide whether the transport must be restarted.
     @Volatile
@@ -128,8 +128,13 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
             return
         }
         // Idempotent listener registration — start() may run again after a reload restart
-        HandlerList.unregisterAll(this)
+        unregisterListeners()
         plugin.server.pluginManager.registerEvents(this, plugin)
+        if (PlatformUtil.hasPlayerInputEvent) {
+            val listener = PlayerInputListener()
+            plugin.server.pluginManager.registerEvents(listener, plugin)
+            inputListener = listener
+        }
 
         val nextTransport: WebTransport = when (cfg.webMode) {
             WebMode.SELF_HOSTED -> DirectWebTransport(
@@ -153,7 +158,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     }
 
     fun stop() {
-        HandlerList.unregisterAll(this)
+        unregisterListeners()
         for (session in sessions.values) {
             val conn = session.conn ?: continue
             try {
@@ -206,9 +211,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     fun onPlayerJoin(event: PlayerJoinEvent) {
         reserveSession(event.player)
         // Delay 1 tick so Bukkit.getOnlinePlayers() includes the newly joined player.
-        plugin.server.globalRegionScheduler.runDelayed(plugin, { _ ->
+        SchedulerUtil.syncDelayed(plugin, 1L) {
             broadcastPlayerList()
-        }, 1L)
+        }
     }
 
     /**
@@ -224,9 +229,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         logger.info("Web voice session ${sessionId} reserved for ${player.name}")
 
         val delayTicks = plugin.bridgeConfig.webLinkDelaySeconds.coerceAtLeast(0) * 20L
-        plugin.server.globalRegionScheduler.runDelayed(plugin, { _ ->
+        SchedulerUtil.syncDelayed(plugin, delayTicks) {
             sendLinkIfActive(player.uniqueId, sessionId)
-        }, delayTicks)
+        }
     }
 
     /**
@@ -263,44 +268,58 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         logger.info("Web voice session $sessionId removed (${event.player.name} quit)")
     }
 
-    @EventHandler
-    fun onPlayerInput(event: PlayerInputEvent) {
-        val session = activeSessionFor(event.player.uniqueId) ?: return
-        val input = event.input
-        val nowSneak = input.isSneak
-        val nowSprint = input.isSprint
-        val wasSneak = session.prevSneakInput
-        val wasSprint = session.prevSprintInput
-        session.prevSneakInput = nowSneak
-        session.prevSprintInput = nowSprint
+    private fun unregisterListeners() {
+        HandlerList.unregisterAll(this)
+        inputListener?.let {
+            HandlerList.unregisterAll(it)
+            inputListener = null
+        }
+    }
 
-        val conn = session.conn ?: return
-        val now = System.currentTimeMillis()
+    /**
+     * Isolated listener for Bukkit's 1.21.3+ `PlayerInputEvent` so servers running earlier
+     * 1.21.x Spigot builds never hit `NoClassDefFoundError` when registering [WebAdapter].
+     */
+    private inner class PlayerInputListener : Listener {
+        @EventHandler
+        fun onPlayerInput(event: org.bukkit.event.player.PlayerInputEvent) {
+            val session = activeSessionFor(event.player.uniqueId) ?: return
+            val input = event.input
+            val nowSneak = input.isSneak
+            val nowSprint = input.isSprint
+            val wasSneak = session.prevSneakInput
+            val wasSprint = session.prevSprintInput
+            session.prevSneakInput = nowSneak
+            session.prevSprintInput = nowSprint
 
-        when (session.ingameTrigger) {
-            IngameTrigger.DOUBLE_SHIFT -> {
-                if (!wasSneak && nowSneak) {
-                    val prev = session.lastShiftPressMs
-                    if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
-                        session.lastShiftPressMs = 0L
-                        triggerMicToggleFromIngame(event.player, conn)
-                    } else {
-                        session.lastShiftPressMs = now
+            val conn = session.conn ?: return
+            val now = System.currentTimeMillis()
+
+            when (session.ingameTrigger) {
+                IngameTrigger.DOUBLE_SHIFT -> {
+                    if (!wasSneak && nowSneak) {
+                        val prev = session.lastShiftPressMs
+                        if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
+                            session.lastShiftPressMs = 0L
+                            triggerMicToggleFromIngame(event.player, conn)
+                        } else {
+                            session.lastShiftPressMs = now
+                        }
                     }
                 }
-            }
-            IngameTrigger.DOUBLE_CTRL -> {
-                if (!wasSprint && nowSprint) {
-                    val prev = session.lastCtrlPressMs
-                    if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
-                        session.lastCtrlPressMs = 0L
-                        triggerMicToggleFromIngame(event.player, conn)
-                    } else {
-                        session.lastCtrlPressMs = now
+                IngameTrigger.DOUBLE_CTRL -> {
+                    if (!wasSprint && nowSprint) {
+                        val prev = session.lastCtrlPressMs
+                        if (prev != 0L && now - prev <= DOUBLE_TAP_WINDOW_MS) {
+                            session.lastCtrlPressMs = 0L
+                            triggerMicToggleFromIngame(event.player, conn)
+                        } else {
+                            session.lastCtrlPressMs = now
+                        }
                     }
                 }
+                else -> {}
             }
-            else -> {}
         }
     }
 
@@ -325,11 +344,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     }
 
     private fun triggerMicToggleFromIngame(player: Player, conn: WebClientConnection) {
+        debugLog { "In-game mic trigger -> web (${player.name})" }
         sendSafe(conn, """{"type":"control","action":"mic_toggle"}""")
-        player.sendActionBar(
-            Component.text("[Voice] ", NamedTextColor.GOLD)
-                .append(Component.text("Microphone toggled", NamedTextColor.AQUA))
-        )
+        Message.mic_toggled.sendActionBar(player)
     }
 
     private fun sendLinkIfActive(playerUuid: UUID, sessionId: UUID) {
@@ -339,22 +356,8 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         val player = Bukkit.getPlayer(playerUuid) ?: return
 
         val link = transport?.buildSessionLink(sessionId) ?: return
-        player.sendMessage(
-            Component.text("[", NamedTextColor.GRAY)
-                .append(Component.text("Voice", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text("] ", NamedTextColor.GRAY))
-                .append(Component.text("Voice chat page: ", NamedTextColor.GRAY))
-                .append(
-                    Component.text(link, NamedTextColor.AQUA, TextDecoration.UNDERLINED)
-                        .clickEvent(ClickEvent.openUrl(link))
-                        .hoverEvent(
-                            HoverEvent.showText(
-                                Component.text("Click to open the voice chat page", NamedTextColor.GRAY)
-                            )
-                        )
-                )
-        )
-        logger.fine("Link sent to ${player.name}: $link")
+        Message.web_link.replaceUrl("{link}", link).send(player)
+        debugLog { "Link sent to ${player.name}: $link" }
     }
 
     // --- WebSocket lifecycle (called from transport worker threads) ---
@@ -366,16 +369,19 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
      */
     fun onConnect(sessionId: UUID?, conn: WebClientConnection) {
         if (sessionId == null) {
+            debugLog { "Rejected web connection: Missing id parameter" }
             reject(conn, "Missing id parameter")
             return
         }
         val session = sessions[sessionId] ?: run {
+            debugLog { "Rejected web connection: Session not found ($sessionId)" }
             reject(conn, "Session not found")
             return
         }
 
         val old = session.conn
         if (old != null && old !== conn) {
+            debugLog { "Replacing existing web connection for ${session.playerName} (session $sessionId)" }
             byConn.remove(old)
             try {
                 old.sendText(infoJson("New page opened; closing this connection"))
@@ -396,6 +402,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     fun onBinary(conn: WebClientConnection, opus: ByteArray) {
         if (opus.isEmpty() || opus.size > MAX_FRAME_BYTES) {
             BridgeMetrics.webDroppedFrames.incrementAndGet()
+            debugLog { "Web->Game dropped invalid frame: bytes=${opus.size}" }
             return
         }
         val session = byConn[conn] ?: return
@@ -432,6 +439,9 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
             }
         }
         if (sent) BridgeMetrics.webToGameFrames.incrementAndGet()
+        debugLog {
+            "Web->Game: ${session.playerName} bytes=${opus.size} dist=$distance pv=$routedToPv svc=$routedToSvc sent=$sent"
+        }
 
         // Direct web-to-web proximity forwarding. Skip any listener who already
         // receives this audio natively via SVC or PV so mod users who also keep
@@ -464,30 +474,26 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
                 session.ingameTrigger = trigger
                 session.lastShiftPressMs = 0L
                 session.lastCtrlPressMs = 0L
-                logger.fine("Updated in-game trigger for ${session.playerName}: $trigger")
+                debugLog { "Updated in-game trigger for ${session.playerName}: $trigger" }
             }
             "mic_state" -> {
                 val muted = extractJsonBoolean(text, "muted") ?: return
                 val notify = extractJsonBoolean(text, "notify") == true
+                debugLog { "Web mic_state from ${session.playerName}: muted=$muted notify=$notify" }
                 if (notify) {
                     val player = Bukkit.getPlayer(session.playerUuid) ?: return
-                    val stateText = if (muted) {
-                        Component.text("Mic: OFF", NamedTextColor.RED)
-                    } else {
-                        Component.text("Mic: ON", NamedTextColor.GREEN)
+                    val stateMessage = if (muted) Message.mic_state_off else Message.mic_state_on
+                    SchedulerUtil.entity(plugin, player) {
+                        stateMessage.sendActionBar(player)
                     }
-                    player.scheduler.run(plugin, { _ ->
-                        player.sendActionBar(
-                            Component.text("[Voice] ", NamedTextColor.GOLD).append(stateText)
-                        )
-                    }, null)
                 }
             }
             "request_players" -> {
+                debugLog { "Web request_players from ${session.playerName}" }
                 sendSafe(conn, buildPlayersJson())
             }
             else -> {
-                logger.fine("Ignoring text message from web client: ${text.take(64)}")
+                debugLog { "Ignoring text message from web client ${session.playerName}: ${text.take(64)}" }
             }
         }
     }
@@ -597,6 +603,22 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         val (sent, dropped) = currentTransport.sendBinaryBatch(targets, audioEnvelope(speakerUuid, opusData))
         if (sent > 0) BridgeMetrics.gameToWebFrames.addAndGet(sent.toLong())
         if (dropped > 0) BridgeMetrics.webDroppedFrames.addAndGet(dropped.toLong())
+        debugLog {
+            "Game->Web: speaker=${speakerPlayer.name} bytes=${opusData.size} dist=$distanceBlocks targets=${targets.size} sent=$sent dropped=$dropped"
+        }
+    }
+
+    internal val isDebugEnabled: Boolean
+        get() = plugin.bridgeConfig.debug
+
+    internal fun logDebug(message: String) {
+        logger.info("[Debug] $message")
+    }
+
+    internal inline fun debugLog(message: () -> String) {
+        if (isDebugEnabled) {
+            logDebug(message())
+        }
     }
 
     // --- Helpers ---

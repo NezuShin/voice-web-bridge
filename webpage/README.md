@@ -32,7 +32,7 @@ status bar and the connection event log.
   - **In-Game Minecraft Keybind for Mic On/Off** (zero client mods, synced
     live via the server): choose from `Double Shift`, `Double Ctrl`,
     `Shift+F` (cancels item swaps), or `Shift+Q` (cancels item drops while
-    holding an item), plus the `/mic` (`/vmic`) in-game chat command.
+    holding an item), plus the `/mic` in-game chat command.
 - **Configurable Microphone State Overlay**:
   - Floating HUD showing live mic state (`SPEAKING`, `MIC ON`, `MIC READY`,
     `MIC OFF`, `DEAFENED`, `OFFLINE`) with configurable layout (`Icon Only`,

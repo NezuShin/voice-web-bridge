@@ -171,7 +171,15 @@ The following libraries are `compileOnly` or downloaded at runtime by the server
 platform and are not redistributed inside the compiled plugin JAR:
 
 - **Kotlin Standard Library & kotlinx.coroutines** — Apache License 2.0
+- **Kyori Adventure (`adventure-text-minimessage`, `adventure-text-serializer-gson`, `adventure-text-serializer-legacy`)** — MIT License (bundled by Paper/Folia; loaded via `plugin.yml` `libraries` on Spigot)
 - **Paper API** — GNU General Public License v3.0 (with Kyori Adventure and Mojang Brigadier under MIT)
 - **Plasmo Voice API / Protocol** (`su.plo.voice.*`) — GNU Lesser General Public License v3.0 (LGPL-3.0)
 - **Plasmo SLib** (`su.plo.slib:api-server`) — MIT License
 - **Simple Voice Chat** (`de.maxhenkel.voicechat:voicechat-api` / runtime `voicechat` plugin) — Main plugin is All Rights Reserved (API templates under MIT); linking is explicitly permitted under [LICENSE-EXCEPTION](LICENSE-EXCEPTION)
+
+---
+
+## 5. Adapted Utilities
+
+- **YAML Config Updater (`io.pfaumc.voicebridge.config.updater.*`)** — Adapted from [NMinimap](https://github.com/NezuShin/NMinimap) (GPLv3), originally derived from `tchristofferson/Config-Updater` (MIT License).
+- **Platform, Scheduler & Message Utilities (`PlatformUtil`, `SchedulerUtil`, `Message`)** — Adapted from [NMinimap](https://github.com/NezuShin/NMinimap) (GPLv3).

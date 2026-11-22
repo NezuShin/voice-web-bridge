@@ -1,6 +1,5 @@
 plugins {
     idea
-    alias(libs.plugins.paper)
     alias(libs.plugins.runpaper)
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.shadow)
@@ -11,6 +10,11 @@ version = project.properties["plugin.version"].toString()
 
 repositories {
     mavenCentral()
+
+    // PaperMC API
+    maven("https://repo.papermc.io/repository/maven-public/") {
+        name = "papermc"
+    }
 
     // Simple Voice Chat API
     maven("https://maven.maxhenkel.de/repository/public") {
@@ -27,7 +31,7 @@ repositories {
 }
 
 dependencies {
-    paperweight.paperDevBundle(project.properties["paper.version"].toString())
+    compileOnly("io.papermc.paper:paper-api:${project.properties["paper.version"]}")
 
     // Simple Voice Chat API (provided at runtime by the mod)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:${project.properties["svc.api.version"]}")
@@ -55,26 +59,42 @@ kotlin {
 }
 
 tasks {
+    jar {
+        enabled = false
+    }
+
     assemble {
-        dependsOn(reobfJar)
+        dependsOn(shadowJar)
     }
 
     shadowJar {
+        archiveClassifier.set("")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         relocate("org.bstats", "io.pfaumc.voicebridge.lib.bstats")
         relocate("org.java_websocket", "io.pfaumc.voicebridge.lib.ws")
         relocate("org.slf4j", "io.pfaumc.voicebridge.lib.slf4j")
         // Rewrites META-INF/services entries to the relocated class names
         // (slf4j loads its provider reflectively via ServiceLoader).
         mergeServiceFiles()
+        // Drop redundant dependency metadata/licenses (all third-party licenses are
+        // consolidated in META-INF/THIRD_PARTY_LICENSES.md). Prevents duplicate ZIP
+        // entries such as slf4j-api + slf4j-jdk14 both shipping META-INF/LICENSE.txt,
+        // which causes Paper's PluginRemapper to fail.
+        exclude(
+            "META-INF/LICENSE.txt",
+            "META-INF/NOTICE.txt",
+            "META-INF/maven/**",
+            "META-INF/*.SF",
+            "META-INF/*.DSA",
+            "META-INF/*.RSA",
+            "module-info.class",
+            "META-INF/versions/*/module-info.class"
+        )
         // No minimize(): Java-WebSocket and SLF4J load classes reflectively,
         // which the minimizer strips.
         from(rootProject.file("LICENSE")) { into("META-INF") }
         from(rootProject.file("LICENSE-EXCEPTION")) { into("META-INF") }
         from(rootProject.file("THIRD_PARTY_LICENSES.md")) { into("META-INF") }
-    }
-
-    reobfJar {
-        inputJar = shadowJar.flatMap { it.archiveFile }
     }
 
     processResources {
