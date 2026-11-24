@@ -270,6 +270,27 @@ class SvcAdapter(private val plugin: VoiceBridgePlugin) : VoicechatPlugin {
     }
 
     /**
+     * Returns true if the player has the Simple Voice Chat client mod installed
+     * (either actively connected via UDP or detected via SVC's client handshake).
+     *
+     * Uses `VoicechatConnection.isInstalled` rather than `isConnected` because
+     * [setExternalPlayerConnected] sets `isConnected = true` for PV-only and
+     * browser-only players so SVC clients display a voice icon for them.
+     */
+    fun hasVoiceModInstalled(playerUuid: UUID): Boolean {
+        if (plugin.sessionManager.getSession(playerUuid)?.hasModType(ModType.SIMPLE_VOICE_CHAT) == true) {
+            return true
+        }
+        val api = serverApi ?: return false
+        return try {
+            api.getConnectionOf(playerUuid)?.isInstalled == true
+        } catch (ex: Exception) {
+            logger.fine("Failed to query SVC mod status for $playerUuid: ${ex.message}")
+            false
+        }
+    }
+
+    /**
      * Mark a non-SVC player as connected/disconnected in SVC's player state.
      * This updates the voice icon for SVC clients.
      * Only works for players without the SVC mod installed (i.e., PV-only or browser players).

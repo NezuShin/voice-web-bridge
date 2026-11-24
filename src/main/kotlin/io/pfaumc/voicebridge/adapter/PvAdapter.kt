@@ -39,7 +39,7 @@ import java.util.logging.Logger
 @Addon(
     id = "voice-web-bridge",
     name = "Voice Web Bridge",
-    version = "1.1.1",
+    version = "2.0.0",
     authors = ["andreypfau", "nezushin"]
 )
 class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
@@ -335,6 +335,38 @@ class PvAdapter(private val plugin: VoiceBridgePlugin) : AddonInitializer {
             source.sendAudioEnd(seq, 0)
             source.remove()
             logger.fine("Cleaned up PV source for player $senderUuid")
+        }
+    }
+
+    /**
+     * Returns true if the player has the Plasmo Voice client mod installed
+     * (either actively connected via a real PV UDP connection or detected via
+     * PV's TCP handshake).
+     *
+     * Explicitly ignores fake [BridgedUdpConnection] entries registered by this
+     * adapter for SVC-only and browser-only players.
+     */
+    fun hasVoiceModInstalled(playerUuid: UUID): Boolean {
+        if (plugin.sessionManager.getSession(playerUuid)?.hasModType(ModType.PLASMO_VOICE) == true) {
+            return true
+        }
+        if (!::voiceServer.isInitialized) return false
+
+        return try {
+            val udpConn = voiceServer.udpConnectionManager.getConnectionByPlayerId(playerUuid).orElse(null)
+            if (udpConn != null && udpConn !is BridgedUdpConnection) {
+                return true
+            }
+
+            val voicePlayer = voiceServer.playerManager.getPlayerById(playerUuid).orElse(null)
+                ?: return false
+            if (voicePlayer.modVersion.isPresent || voicePlayer.publicKey.isPresent) {
+                return true
+            }
+            udpConn == null && !bridgedConnectionUuids.contains(playerUuid) && voicePlayer.hasVoiceChat()
+        } catch (ex: Exception) {
+            logger.fine("Failed to query PV mod status for $playerUuid: ${ex.message}")
+            false
         }
     }
 

@@ -26,9 +26,9 @@ import java.util.logging.Logger
 /**
  * Browser voice page adapter.
  *
- * Each player gets a random per-join session UUID. After a configurable delay the player
- * receives a clickable link: `<link-template>` with `{uuid}` replaced. The browser page
- * connects to the embedded WebSocket server with this id.
+ * Each player gets a random per-join session UUID. After a configurable delay, players
+ * without an installed voice mod receive a clickable link: `<link-template>` with `{uuid}`
+ * replaced. The browser page connects to the embedded WebSocket server with this id.
  *
  * Audio flow:
  * - Browser mic (raw Opus 48 kHz / 20 ms frames) → relayed to nearby SVC and PV players
@@ -217,7 +217,8 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
     }
 
     /**
-     * Reserves a web session for a player and schedules the link message.
+     * Reserves a web session for a player and schedules the invitation link message
+     * (skipped automatically if the player has a voice mod installed).
      */
     private fun reserveSession(player: Player) {
         val sessionId = UUID.randomUUID()
@@ -230,7 +231,7 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
 
         val delayTicks = plugin.bridgeConfig.webLinkDelaySeconds.coerceAtLeast(0) * 20L
         SchedulerUtil.syncDelayed(plugin, delayTicks) {
-            sendLinkIfActive(player.uniqueId, sessionId)
+            sendInvitationIfEligible(player.uniqueId, sessionId)
         }
     }
 
@@ -349,12 +350,38 @@ class WebAdapter(private val plugin: VoiceBridgePlugin) : Listener {
         Message.mic_toggled.sendActionBar(player)
     }
 
+    private fun hasVoiceModInstalled(playerUuid: UUID): Boolean {
+        if (plugin.sessionManager.isRegistered(playerUuid)) return true
+        if (svcAdapter?.hasVoiceModInstalled(playerUuid) == true) return true
+        if (pvAdapter?.hasVoiceModInstalled(playerUuid) == true) return true
+        return false
+    }
+
+    private fun sendInvitationIfEligible(playerUuid: UUID, sessionId: UUID) {
+        val session = sessions[sessionId] ?: return
+        if (session.playerUuid != playerUuid) return
+        if (byPlayer[playerUuid] != sessionId) return
+        if (session.conn?.isOpen == true) return
+        val player = Bukkit.getPlayer(playerUuid) ?: return
+
+        if (hasVoiceModInstalled(playerUuid)) {
+            debugLog { "Skipping web voice invitation for ${player.name}: voice mod installed" }
+            return
+        }
+
+        sendLink(player, sessionId)
+    }
+
     private fun sendLinkIfActive(playerUuid: UUID, sessionId: UUID) {
         val session = sessions[sessionId] ?: return
         if (session.playerUuid != playerUuid) return
         if (byPlayer[playerUuid] != sessionId) return
         val player = Bukkit.getPlayer(playerUuid) ?: return
 
+        sendLink(player, sessionId)
+    }
+
+    private fun sendLink(player: Player, sessionId: UUID) {
         val link = transport?.buildSessionLink(sessionId) ?: return
         Message.web_link.replaceUrl("{link}", link).send(player)
         debugLog { "Link sent to ${player.name}: $link" }

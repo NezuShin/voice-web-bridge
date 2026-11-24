@@ -59,6 +59,7 @@ web:
   link-template: "https://bla-bla.com/voicechat.html?id={uuid}"
 
   # Delay in seconds before the link message is sent after joining
+  # (gives voice mods time to connect; skipped if the player has a voice mod installed)
   link-delay-seconds: 5
 
 # Per-world distance overrides (optional)
