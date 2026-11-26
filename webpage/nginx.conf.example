@@ -4,21 +4,26 @@
 # plugin's embedded server (web.host / web.port in plugins/voice-web-bridge/config.yml,
 # defaults: 127.0.0.1:8090).
 #
-# Adapt: server_name, TLS certificate paths, and the root/alias to this folder.
+# Adapt: server_name and the root/alias to this folder (plus TLS certificates for port 443).
 
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
 }
 
+# --- HTTP -> HTTPS redirect ---
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 80;
+    listen [::]:80;
     server_name bla-bla.com;
 
-    # --- TLS (required: getUserMedia only works on https) ---
-    ssl_certificate     /etc/letsencrypt/live/bla-bla.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/bla-bla.com/privkey.pem;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name bla-bla.com;
 
     # --- Static page + vendored assets ---
     # Example with root pointing at the webpage/ directory of this project:

@@ -16,7 +16,7 @@
 - Web-based voicechat for vanilla and bedrock players
 - Configurable overlay in web
 - Voice chat available in 3 clicks for players
-- Plug-n-play for small server admins - **without additional ports forwarding, webserver and ssl configuration**
+- Plug-n-play for small servers and play with friends - **without additional ports forwarding, webserver and ssl configuration**
 - Fully self-hostable for advanced setups and big servers - **no limits, max webpage configurability**
 - Always free and open source under GPL-3 license
 
@@ -35,6 +35,9 @@
 - Install [Plasmo Voice](https://modrinth.com/plugin/plasmo-voice)
 - Install latest release from [releases](https://github.com/NezuShin/voice-web-bridge/releases)
 
+### Self-hosted webpage configuration
+
+In this mode plugin works different way - it serves websocket server itself. Nginx needed here only for ssl proxy and webpage hosting. Example config is [available here](https://github.com/NezuShin/voice-web-bridge/blob/main/webpage/nginx.conf.example). Nothing will work without SSL - modern browsers want encryption to use microphone on page. And mix of http/ws and https is also prohibited.
 
 ### Permissions
 
