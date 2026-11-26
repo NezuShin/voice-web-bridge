@@ -2,8 +2,8 @@
 
 `voicechat.html` + `styles.css` + `app.js` implement a Simple Voice Chat-styled
 browser voice client for Voice Web Bridge using the vendored
-[Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL OFL 1.1,
-`lib/PixelifySans.ttf`). The plugin sends each player a link after they join:
+[Roboto](https://github.com/googlefonts/roboto-3-classic) font (SIL OFL 1.1,
+`lib/Roboto.ttf`). The plugin sends each player a link after they join:
 
 ```
 https://bla-bla.com/voicechat.html?id=<session-uuid>
@@ -18,7 +18,7 @@ status bar and the connection event log.
 ## Features
 
 - **Simple Voice Chat GUI**: Pixel-art Minecraft GUI styling using
-  `lib/PixelifySans.ttf`, live input level meter, local mic loopback test, and
+  `lib/Roboto.ttf`, live input level meter, local mic loopback test, and
   optional 8-bit UI sound cues.
 - **Server Players List & Per-Player Volume Controls**:
   - Live list of online players on the server with voice mod badges
@@ -27,17 +27,15 @@ status bar and the connection event log.
     volume sliders (0–200%), quick 100% reset, and per-player mute.
 - **Voice Activation & In-Game Minecraft Mic On/Off Keybind**:
   - **Voice Activation**: Open Mic or configurable dB threshold + holdover
-    delay, configurable on-screen Mic On/Off button visibility, and Mic Off
-    hardware behavior (Soft Mute, Disable Track, or Release Mic).
+    delay, with instant soft mute via the primary Mic On/Off button.
   - **In-Game Minecraft Keybind for Mic On/Off** (zero client mods, synced
     live via the server): choose from `Double Shift`, `Double Ctrl`,
     `Shift+F` (cancels item swaps), or `Shift+Q` (cancels item drops while
     holding an item), plus the `/mic` in-game chat command.
 - **Configurable Microphone State Overlay**:
-  - Floating HUD showing live mic state (`SPEAKING`, `MIC ON`, `MIC READY`,
-    `MIC OFF`, `DEAFENED`, `OFFLINE`) with configurable layout (`Icon Only`,
-    `Mic State Badge`, `Full HUD`), themes, scale, opacity, and quick Mic
-    On/Off button.
+  - HUD showing live mic state (`SPEAKING`, `MIC ON`, `MIC READY`, `MIC OFF`,
+    `DEAFENED`, `OFFLINE`) with configurable status label, player name, level
+    meter, keybind hint, active speakers list, and quick Mic On/Off button.
   - **Pop Out** launches an always-on-top Document Picture-in-Picture overlay
     window in Chromium browsers; `?id=<uuid>&overlay=1&transparent=1` is
     supported for OBS Browser Source.
@@ -45,6 +43,10 @@ status bar and the connection event log.
   Chromium browsers), output volume (0–200%), microphone gain (0–200%), and
   echo cancellation / noise suppression / auto gain toggles. All preferences
   persist in `localStorage`.
+- **Localization (`en_US`, `ru_RU`)**: External locale files in `lang/en_US.json`
+  and `lang/ru_RU.json` (with built-in `en_US` fallback), auto-detected from
+  browser language (`navigator.languages`) and switchable live from the header
+  selector (saved in `localStorage`).
 
 ## How it works
 
@@ -133,5 +135,5 @@ node .test/verify.js
   GPLv3 Section 6, when distributing packaged releases containing these
   prebuilt binaries, provide the `opus-recorder` v8.0.5 source archive
   alongside the release (see [`../THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md)).
-- `lib/PixelifySans.ttf` is licensed exclusively under the **SIL Open Font
-  License 1.1** (see [`lib/PixelifySans-LICENSE.txt`](lib/PixelifySans-LICENSE.txt)).
+- `lib/Roboto.ttf` is licensed exclusively under the **SIL Open Font
+  License 1.1** (see [`lib/Roboto-LICENSE.txt`](lib/Roboto-LICENSE.txt)).

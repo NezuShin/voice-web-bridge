@@ -25,6 +25,7 @@
   var STORAGE_SETTINGS_KEY = 'voicebridge-settings-v1';
   var STORAGE_VOLUME_KEY = 'voicebridge-volume';
   var STORAGE_SPEAKERS_KEY = 'voicebridge-speakers-v1';
+  var STORAGE_LANG_KEY = 'voicebridge-lang';
 
   // --- DOM References ---
   var statusEl = document.getElementById('status');
@@ -44,6 +45,7 @@
   var btnReconnect = document.getElementById('btn-reconnect');
   var btnExitFocus = document.getElementById('btn-exit-focus');
   var btnPopout = document.getElementById('btn-popout-overlay');
+  var langSel = document.getElementById('lang-select');
 
   var bannerMissingId = document.getElementById('banner-missing-id');
   var manualSessionInput = document.getElementById('manual-session-input');
@@ -89,8 +91,6 @@
   var vadHoldoverEl = document.getElementById('vad-holdover');
   var vadHoldoverValEl = document.getElementById('vad-holdover-val');
 
-  var micMuteModeSel = document.getElementById('mic-mute-mode');
-  var toggleMicBtnVisible = document.getElementById('toggle-mic-btn-visible');
   var toggleMuteOnDeafen = document.getElementById('toggle-mute-on-deafen');
   var toggleUiSounds = document.getElementById('toggle-ui-sounds');
   var toggleEcBtn = document.getElementById('toggle-ec');
@@ -104,24 +104,12 @@
   // Overlay Config Tab
   var pipActiveNotice = document.getElementById('pip-active-notice');
   var btnRecallPip = document.getElementById('btn-recall-pip');
-  var toggleOverlayEnabled = document.getElementById('toggle-overlay-enabled');
-  var overlayStyleSel = document.getElementById('overlay-style');
-  var overlayThemeSel = document.getElementById('overlay-theme');
-  var overlayPositionSel = document.getElementById('overlay-position');
-  var toggleOverlayLock = document.getElementById('toggle-overlay-lock');
-  var btnOverlayPopout = document.getElementById('btn-overlay-popout');
-  var btnOverlayResetPos = document.getElementById('btn-overlay-reset-pos');
-  var overlayScaleEl = document.getElementById('overlay-scale');
-  var overlayScaleValEl = document.getElementById('overlay-scale-val');
-  var overlayOpacityEl = document.getElementById('overlay-opacity');
-  var overlayOpacityValEl = document.getElementById('overlay-opacity-val');
   var toggleOvLabel = document.getElementById('toggle-ov-label');
   var toggleOvName = document.getElementById('toggle-ov-name');
   var toggleOvControls = document.getElementById('toggle-ov-controls');
   var toggleOvMeter = document.getElementById('toggle-ov-meter');
   var toggleOvKeys = document.getElementById('toggle-ov-keys');
   var toggleOvSpeakers = document.getElementById('toggle-ov-speakers');
-  var toggleOvDim = document.getElementById('toggle-ov-dim');
   var btnResetOverlay = document.getElementById('btn-reset-overlay');
   var obsUrlInput = document.getElementById('obs-url-input');
   var btnCopyObsUrl = document.getElementById('btn-copy-obs-url');
@@ -137,45 +125,397 @@
   var eventLogEl = document.getElementById('event-log');
   var btnClearLog = document.getElementById('btn-clear-log');
 
-  // Floating Overlay Elements
+  // Overlay Elements (Pop-Out PiP & Standalone/OBS)
   var overlayEl = document.getElementById('voice-overlay');
   var ovMicSvg = document.getElementById('ov-mic-svg');
   var ovStateLine = document.getElementById('ov-state-line');
   var ovSubLine = document.getElementById('ov-sub-line');
-  var ovBtnPopout = document.getElementById('ov-btn-popout');
   var ovMeterEl = document.getElementById('ov-meter');
   var ovMeterFill = document.getElementById('ov-meter-fill');
   var ovControlsEl = document.getElementById('ov-controls');
   var ovBtnMic = document.getElementById('ov-btn-mic');
   var ovSpeakersEl = document.getElementById('ov-speakers');
 
+  // --- Internationalization (i18n) ---
+
+  var SUPPORTED_LOCALES = ['en_US', 'ru_RU'];
+
+  var INLINE_EN_US = {
+    'page.title': 'Voice Web Bridge - Proximity Voice Chat',
+
+    'common.on': 'ON',
+    'common.off': 'OFF',
+    'common.refresh': 'Refresh',
+
+    'focus.label': 'Overlay Focus Mode',
+    'focus.exit': 'Exit Overlay Mode',
+
+    'header.brand_title': 'VOICE WEB BRIDGE',
+    'header.brand_subtitle': 'SIMPLE VOICE CHAT + PLASMO PROXIMITY WEB',
+    'header.identity_title': 'Connected Minecraft player',
+    'header.player_default': 'Player',
+    'header.conn_connecting': 'CONNECTING',
+    'header.conn_connected': 'CONNECTED',
+    'header.conn_offline': 'OFFLINE',
+    'header.conn_no_session': 'NO SESSION',
+    'header.reconnect': 'Reconnect',
+    'header.popout': 'Pop Out',
+    'header.popout_title': 'Pop out always-on-top overlay window',
+    'header.lang_title': 'Interface language',
+
+    'banner.missing_id_title': 'No session ID in URL.',
+    'banner.missing_id_hint': 'Open the link from Minecraft chat (?id=...) or paste your session UUID below. Settings and local mic test still work!',
+    'banner.manual_session_placeholder': 'Paste session UUID or URL...',
+    'banner.connect_btn': 'Connect',
+    'banner.insecure_title': 'Microphone unavailable on insecure HTTP.',
+    'banner.insecure_hint': 'Browsers require https:// or localhost for getUserMedia. You can still hear nearby players.',
+    'banner.perm_needed_title': 'Microphone permission needed.',
+    'banner.perm_needed_hint': 'Click Enable Microphone so the browser shows the audio permission prompt.',
+    'banner.perm_unavailable_title': 'Microphone unavailable.',
+    'banner.perm_unavailable_hint': 'Allow microphone permission and click Enable Microphone.',
+    'banner.enable_mic_btn': 'Enable Microphone',
+    'banner.retry_mic_btn': 'Retry Microphone',
+    'banner.playback_paused_title': 'Browser paused audio playback.',
+    'banner.playback_paused_hint': 'Click Resume Audio to hear nearby players.',
+    'banner.resume_audio_btn': 'Resume Audio',
+
+    'hero.unsupported_title': 'UNSUPPORTED BROWSER',
+    'hero.unsupported_sub': 'WebRTC + WebAssembly + Workers required',
+    'hero.unsupported_ov': 'UNSUPPORTED',
+    'hero.insecure_title': 'LISTEN ONLY (HTTP)',
+    'hero.insecure_sub': 'Serve over https:// or localhost for mic',
+    'hero.insecure_ov': 'LISTEN ONLY',
+    'hero.disconnected_title': 'DISCONNECTED',
+    'hero.disconnected_sub': 'Not connected to voice server',
+    'hero.missing_id_sub': 'Missing session ID',
+    'hero.disconnected_ov': 'OFFLINE',
+    'hero.deafened_title': 'DEAFENED',
+    'hero.deafened_both_sub': 'Output & microphone muted',
+    'hero.deafened_out_sub': 'Speaker output muted',
+    'hero.deafened_ov': 'DEAFENED',
+    'hero.muted_title': 'MIC OFF (MUTED)',
+    'hero.muted_keybind_sub': 'Press {trigger} in Minecraft or click Mic',
+    'hero.muted_default_sub': 'Click Mic or run /mic in Minecraft to unmute',
+    'hero.muted_ov': 'MIC OFF',
+    'hero.blocked_title': 'MIC BLOCKED',
+    'hero.blocked_sub': 'Check browser permission and retry',
+    'hero.blocked_ov': 'MIC ERROR',
+    'hero.click_enable_title': 'CLICK TO ENABLE MIC',
+    'hero.click_enable_sub': 'Browser requires a click to prompt mic access',
+    'hero.click_enable_ov': 'ENABLE MIC',
+    'hero.test_speaking_title': 'MIC TEST (SPEAKING)',
+    'hero.test_active_title': 'MIC TEST ACTIVE',
+    'hero.test_sub': 'Local loopback only — not sent to server',
+    'hero.test_speaking_ov': 'TEST: SPEAKING',
+    'hero.test_active_ov': 'MIC TEST',
+    'hero.connecting_title': 'CONNECTING...',
+    'hero.connecting_sub': 'Waiting for voice server handshake',
+    'hero.connecting_ov': 'CONNECTING',
+    'hero.speaking_title': 'SPEAKING',
+    'hero.speaking_sub': 'Voice transmitting to nearby players',
+    'hero.speaking_ov': 'SPEAKING',
+    'hero.open_mic_title': 'MIC ON (OPEN)',
+    'hero.open_mic_sub': 'Open microphone active',
+    'hero.open_mic_ov': 'MIC ON',
+    'hero.voice_ready_title': 'VOICE READY',
+    'hero.voice_ready_sub': 'Threshold: {db} dB',
+    'hero.voice_ready_ov': 'MIC READY',
+
+    'meter.input_level': 'Input Level',
+    'meter.input_muted': 'Input Level (Muted)',
+    'meter.transmitting': 'Transmitting',
+    'unit.db': '{value} dB',
+    'unit.ms': '{value} ms',
+
+    'controls.mic_prefix': 'Mic: ',
+    'controls.mic_muted_sub': 'Muted (click to enable)',
+    'controls.mic_transmitting_sub': 'Transmitting...',
+    'controls.mic_active_sub': 'Active (click to mute)',
+    'controls.sound_prefix': 'Sound: ',
+    'controls.deafened_sub': 'Deafened (click to unmute)',
+    'controls.deafen_sub': 'Click to deafen',
+    'controls.speakers_volume': 'Speakers Volume',
+    'controls.mic_gain': 'Microphone Gain',
+
+    'tabs.voice': 'Voice & Controls',
+    'tabs.players': 'Players',
+    'tabs.overlay': 'Overlay Config',
+    'tabs.log': 'Log',
+
+    'devices.title': 'Audio Devices',
+    'devices.mic_label': 'Recording Device (Microphone)',
+    'devices.speaker_label': 'Playback Device (Speakers)',
+    'devices.default_device': 'Default Device',
+    'devices.numbered_device': 'Device {index}',
+    'devices.sinkid_unsupported': 'This browser does not support speaker selection (setSinkId); system default output is used.',
+    'devices.mic_test_label': 'Test Microphone (Local Loopback)',
+    'devices.mic_test_hint': 'Hear your own mic locally without sending to server',
+    'devices.testing': 'TESTING',
+
+    'vad.title': 'Voice Activation',
+    'vad.threshold_label': 'Voice Activation Threshold',
+    'vad.threshold_open': '{db} dB (Open Mic)',
+    'vad.open_mic': 'Open Mic',
+    'vad.preset_65': '-65 dB',
+    'vad.preset_50': '-50 dB',
+    'vad.preset_35': '-35 dB',
+    'vad.holdover_label': 'Voice Holdover Delay',
+
+    'keybind.title': 'Minecraft Keybind',
+    'keybind.sync_ready': 'Server Sync: READY',
+    'keybind.sync_update': 'Server Sync: Update Plugin',
+    'keybind.sync_offline': 'Server Sync: Offline',
+    'keybind.section_hint': 'Toggle your microphone On/Off directly inside Minecraft (synced live via the server, zero client mods).',
+    'keybind.select_label': 'Mic On/Off Keybind (In-Game)',
+    'keybind.off_option': 'Off (Disabled)',
+    'keybind.off_label': 'Off',
+    'keybind.off_hint': 'No Minecraft keybind active. You can still run /mic in Minecraft chat or click Mic On/Off here.',
+    'keybind.double_shift_label': 'Double Shift',
+    'keybind.double_shift_hint': 'Quickly double-tap Shift (Sneak) in Minecraft to toggle your microphone On/Off.',
+    'keybind.double_ctrl_label': 'Double Ctrl',
+    'keybind.double_ctrl_hint': 'Quickly double-tap Ctrl (Sprint) in Minecraft to toggle your microphone On/Off.',
+    'keybind.shift_f_label': 'Shift+F',
+    'keybind.shift_f_hint': 'Press Shift+F (Sneak + Swap Hand) in Minecraft to toggle your microphone On/Off. Accidental item swaps are cancelled.',
+    'keybind.shift_q_label': 'Shift+Q',
+    'keybind.shift_q_hint': 'Press Shift+Q (Sneak + Drop) in Minecraft to toggle your microphone On/Off. Accidental item drops are cancelled (requires holding an item).',
+
+    'processing.title': 'Mic & Audio Processing',
+    'processing.mute_on_deafen': 'Mute Mic When Deafened',
+    'processing.ui_sounds': 'UI Sound Cues (Click/Beep)',
+    'processing.filters_label': 'Browser Mic Filters (restarts mic)',
+    'processing.ec_btn': 'Echo Cancel: {state}',
+    'processing.ns_btn': 'Noise Supp: {state}',
+    'processing.agc_btn': 'Auto Gain: {state}',
+    'processing.reset_audio': 'Reset Audio Defaults',
+
+    'overlay.pip_active': 'Overlay is currently popped out in an Always-on-Top window.',
+    'overlay.dock_back': 'Dock Back to Page',
+    'overlay.appearance_title': 'Overlay Appearance & Elements',
+    'overlay.show_label': 'Show State Text (SPEAKING / MUTED)',
+    'overlay.show_name': 'Show Player Name in Overlay',
+    'overlay.show_controls': 'Show Quick Mic Button',
+    'overlay.show_meter': 'Show Live Mic Bar',
+    'overlay.show_keys': 'Show Minecraft Keybind Hint',
+    'overlay.show_speakers': 'Show Active Speakers',
+    'overlay.reset_defaults': 'Reset Overlay Defaults',
+    'overlay.obs_title': 'Standalone / OBS Browser Source URL',
+    'overlay.obs_hint': 'Open this URL in a small window or OBS Browser Source (add &transparent=1 for transparent backdrop).',
+    'overlay.copy_url': 'Copy URL',
+    'overlay.copied': 'Copied!',
+    'overlay.aria_label': 'Microphone State Overlay',
+    'overlay.pip_window_title': 'Voice Web Bridge Overlay',
+    'overlay.connected_sub': 'Connected',
+    'overlay.mic_btn': 'Mic: {state}',
+
+    'players.title': 'Adjust Player Volumes',
+    'players.summary': 'Online: {online} • Voice: {voice}',
+    'players.summary_speaking': 'Online: {online} • Voice: {voice} • Speaking: {speaking}',
+    'players.reset_volumes': 'Reset Volumes',
+    'players.search_placeholder': 'Search server players...',
+    'players.filter_all': 'All',
+    'players.filter_voice': 'Voice Only',
+    'players.filter_speaking': 'Speaking',
+    'players.section_hint': 'Adjust individual player volumes (0%-200%) or mute players like in Simple Voice Chat. Changes save automatically per player.',
+    'players.empty_server': 'No other players online on the server yet. Online players will appear here automatically once connected.',
+    'players.empty_filter': 'No players match the current search/filter.',
+    'players.fallback_name': 'Player {id}',
+    'players.badge_voice': 'VOICE',
+    'players.badge_no_voice': 'NO VOICE',
+    'players.speaking_tag': 'SPEAKING',
+    'players.alias_title': 'Click to set local alias',
+    'players.reset_one_title': 'Reset player volume to 100%',
+    'players.mute': 'MUTE',
+    'players.muted': 'MUTED',
+
+    'log.title': 'Connection & Event Log',
+    'log.session_meta': 'Session: {id}',
+    'log.session_none': 'none',
+    'log.clear': 'Clear Log',
+
+    'footer.connecting': 'Connecting...',
+    'footer.codec': 'Opus 48 kHz • 20 ms • Mono',
+
+    'status.connecting_ws': 'Connecting to voice server...',
+    'status.connected_insecure': 'Connected (listen only — https:// or localhost required for mic).',
+    'status.connected_unsupported': 'Connected (listen only — browser lacks recording support).',
+    'status.connected': 'Connected to Voice Web Bridge.',
+    'status.ws_closed': 'Closed ({code})',
+    'status.ws_closed_reason': 'Closed ({code}): {reason}',
+    'status.reconnecting': 'Reconnecting in {seconds}s (attempt {attempt}/{max})...',
+    'status.ws_error': 'WebSocket error — is the voice server running?',
+    'status.insecure_append': 'Microphone unavailable: serve this page over https:// (or localhost).',
+    'status.encoder_error': 'Encoder worker error: {error}',
+    'status.mic_active': 'Microphone active — Voice active.',
+    'status.mic_err_denied': 'Microphone permission was not granted. Allow the microphone in browser site settings, then click Enable Microphone.',
+    'status.mic_err_not_found': 'No microphone found. Connect a microphone and retry.',
+    'status.mic_err_busy': 'Microphone is busy in another application. Close it and retry.',
+    'status.mic_err_overconstrained': 'Selected microphone does not support requested settings. Pick another device.',
+    'status.mic_err_generic': 'Microphone error: {error}',
+    'status.pip_unsupported': 'Pop-Out Always-on-Top window requires a Chromium browser (Chrome/Edge/Brave).',
+    'status.pip_opened': 'Popped out always-on-top overlay window.',
+    'status.pip_failed': 'Could not open popout window: {error}',
+    'status.speaker_unsupported': 'This browser does not support speaker selection.',
+    'status.speaker_failed': 'Speaker change failed: {error}',
+    'status.audio_reset': 'Audio & keybind settings reset to defaults.',
+    'status.keybind_set': 'Minecraft Mic On/Off keybind set to: {label}',
+    'status.overlay_reset': 'Overlay settings reset to defaults.',
+    'status.volumes_reset': 'Reset all player volumes to 100%.',
+    'status.boot_unsupported': 'This browser does not support recording (getUserMedia + WebAssembly + Workers required).',
+    'status.boot_insecure': 'Microphone unavailable: serve this page over https:// (or localhost). Playback still works.',
+    'status.boot_no_id': 'No id parameter in URL. Open the link from game chat (?id=...) or paste a session ID above.',
+
+    'server.connected_as': 'Connected as {player}',
+    'server.replaced_info': 'New page opened; closing this connection',
+    'server.replaced_reason': 'New page opened',
+    'server.missing_id': 'Missing id parameter',
+    'server.session_not_found': 'Session not found',
+    'server.player_left': 'Player left the game',
+    'server.server_stopped': 'Server stopped'
+  };
+
+  var loadedLocales = { en_US: INLINE_EN_US };
+  var localePromises = {};
+
+  function matchSupportedLocale(tag) {
+    if (!tag || typeof tag !== 'string') return null;
+    var cleaned = tag.trim().replace(/-/g, '_');
+    if (!cleaned) return null;
+    var lower = cleaned.toLowerCase();
+    for (var i = 0; i < SUPPORTED_LOCALES.length; i++) {
+      if (SUPPORTED_LOCALES[i].toLowerCase() === lower) {
+        return SUPPORTED_LOCALES[i];
+      }
+    }
+    var prefix = lower.split('_')[0];
+    if (prefix === 'ru') return 'ru_RU';
+    if (prefix === 'en') return 'en_US';
+    return null;
+  }
+
+  function detectInitialLocale() {
+    try {
+      var saved = localStorage.getItem(STORAGE_LANG_KEY);
+      var matchedSaved = matchSupportedLocale(saved);
+      if (matchedSaved) return matchedSaved;
+    } catch (e) {}
+
+    var browserList = [];
+    if (typeof navigator !== 'undefined') {
+      if (Array.isArray(navigator.languages)) {
+        browserList = browserList.concat(navigator.languages);
+      }
+      if (navigator.language) {
+        browserList.push(navigator.language);
+      }
+    }
+    for (var i = 0; i < browserList.length; i++) {
+      var matched = matchSupportedLocale(browserList[i]);
+      if (matched) return matched;
+    }
+    return 'en_US';
+  }
+
+  var currentLocale = detectInitialLocale();
+
+  function htmlLangForLocale(locale) {
+    return String(locale || 'en_US').split('_')[0].toLowerCase() || 'en';
+  }
+
+  function t(key, params) {
+    var dict = loadedLocales[currentLocale] || INLINE_EN_US;
+    var template = Object.prototype.hasOwnProperty.call(dict, key)
+      ? dict[key]
+      : (Object.prototype.hasOwnProperty.call(INLINE_EN_US, key) ? INLINE_EN_US[key] : key);
+    if (!params) return template;
+    return String(template).replace(/\{(\w+)\}/g, function (full, k) {
+      return Object.prototype.hasOwnProperty.call(params, k) && params[k] !== undefined && params[k] !== null
+        ? String(params[k])
+        : full;
+    });
+  }
+
+  function loadLocaleFile(locale) {
+    if (localePromises[locale]) return localePromises[locale];
+    if (typeof fetch !== 'function') {
+      if (!loadedLocales[locale]) loadedLocales[locale] = INLINE_EN_US;
+      return Promise.resolve(loadedLocales[locale]);
+    }
+    var url = 'lang/' + encodeURIComponent(locale) + '.json';
+    localePromises[locale] = fetch(url, { cache: 'no-cache' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (json) {
+        if (json && typeof json === 'object') {
+          var merged = {};
+          var k;
+          for (k in INLINE_EN_US) merged[k] = INLINE_EN_US[k];
+          for (k in json) {
+            if (Object.prototype.hasOwnProperty.call(json, k) && typeof json[k] === 'string') {
+              merged[k] = json[k];
+            }
+          }
+          loadedLocales[locale] = merged;
+        }
+        return loadedLocales[locale] || INLINE_EN_US;
+      })
+      .catch(function () {
+        delete localePromises[locale];
+        if (!loadedLocales[locale]) loadedLocales[locale] = INLINE_EN_US;
+        return loadedLocales[locale];
+      });
+    return localePromises[locale];
+  }
+
+  function applyDomTranslations(rootDoc) {
+    var doc = rootDoc || document;
+    if (!doc) return;
+    doc.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n');
+      if (key) el.textContent = t(key);
+    });
+    doc.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n-placeholder');
+      if (key) el.setAttribute('placeholder', t(key));
+    });
+    doc.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n-title');
+      if (key) el.setAttribute('title', t(key));
+    });
+    doc.querySelectorAll('[data-i18n-aria-label]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n-aria-label');
+      if (key) el.setAttribute('aria-label', t(key));
+    });
+  }
+
   // --- Minecraft In-Game Mic Keybinds ---
 
   var INGAME_TRIGGER_INFO = {
     off: {
       chip: '',
-      label: 'Off',
-      hint: 'No Minecraft keybind active. You can still run /mic in Minecraft chat or click Mic On/Off here.'
+      labelKey: 'keybind.off_label',
+      hintKey: 'keybind.off_hint'
     },
     double_shift: {
       chip: '2x SHIFT',
-      label: 'Double Shift',
-      hint: 'Quickly double-tap Shift (Sneak) in Minecraft to toggle your microphone On/Off.'
+      labelKey: 'keybind.double_shift_label',
+      hintKey: 'keybind.double_shift_hint'
     },
     double_ctrl: {
       chip: '2x CTRL',
-      label: 'Double Ctrl',
-      hint: 'Quickly double-tap Ctrl (Sprint) in Minecraft to toggle your microphone On/Off.'
+      labelKey: 'keybind.double_ctrl_label',
+      hintKey: 'keybind.double_ctrl_hint'
     },
     shift_f: {
       chip: 'SHIFT+F',
-      label: 'Shift+F',
-      hint: 'Press Shift+F (Sneak + Swap Hand) in Minecraft to toggle your microphone On/Off. Accidental item swaps are cancelled.'
+      labelKey: 'keybind.shift_f_label',
+      hintKey: 'keybind.shift_f_hint'
     },
     shift_q: {
       chip: 'SHIFT+Q',
-      label: 'Shift+Q',
-      hint: 'Press Shift+Q (Sneak + Drop) in Minecraft to toggle your microphone On/Off. Accidental item drops are cancelled (requires holding an item).'
+      labelKey: 'keybind.shift_q_label',
+      hintKey: 'keybind.shift_q_hint'
     }
   };
 
@@ -188,7 +528,12 @@
   }
 
   function getIngameTriggerInfo(value) {
-    return INGAME_TRIGGER_INFO[normalizeIngameTrigger(value)];
+    var meta = INGAME_TRIGGER_INFO[normalizeIngameTrigger(value)];
+    return {
+      chip: meta.chip,
+      label: t(meta.labelKey),
+      hint: t(meta.hintKey)
+    };
   }
 
   // --- Defaults & Settings Persistence ---
@@ -204,8 +549,6 @@
       muteMicOnDeafen: true,
       vadThresholdDb: -100,  // -100 = Open Mic
       vadHoldoverMs: 300,
-      micButtonVisible: true,
-      micMuteMode: 'soft',   // 'soft' | 'track' | 'release'
       uiSounds: true,
       echoCancellation: true,
       noiseSuppression: true,
@@ -216,22 +559,12 @@
 
   function defaultOverlaySettings() {
     return {
-      enabled: true,
-      style: 'badge',        // 'icon' | 'badge' | 'hud'
-      theme: 'svc-dark',     // 'svc-dark' | 'mc-stone' | 'transparent' | 'high-contrast'
-      position: 'bottom-left',
-      customX: 16,
-      customY: 16,
-      scale: 100,
-      opacity: 95,
-      lockPosition: false,
       showLabel: true,
       showPlayerName: true,
       showControls: true,
       showMeter: true,
       showKeyHints: true,
-      showSpeakers: true,
-      dimWhenIdle: false
+      showSpeakers: true
     };
   }
 
@@ -333,7 +666,8 @@
   var encoderReady = false;
   var captureSeq = 0;
   var micPermissionState = !browserSupported ? 'unsupported' : (!secureContext ? 'insecure' : 'prompt');
-  var micErrorHint = '';
+  var micErrorKey = '';
+  var micErrorParams = null;
 
   var playbackCtx = null;
   var playbackDest = null;
@@ -352,6 +686,9 @@
   var smoothedLevel = 0;
   var lastUiMeterPaint = 0;
   var pipWindow = null;
+  var copyObsCopied = false;
+  var copyObsTimer = null;
+  var lastStatus = null;
 
   // --- Logging & Status ---
 
@@ -371,9 +708,56 @@
     eventLogEl.scrollTop = eventLogEl.scrollHeight;
   }
 
+  function translateServerText(raw) {
+    if (typeof raw !== 'string' || !raw) return raw;
+    var m = raw.match(/^Connected as (.+)$/);
+    if (m && m[1]) return t('server.connected_as', { player: m[1].trim() });
+    if (raw === 'New page opened; closing this connection') return t('server.replaced_info');
+    if (raw === 'New page opened') return t('server.replaced_reason');
+    if (raw === 'Missing id parameter') return t('server.missing_id');
+    if (raw === 'Session not found') return t('server.session_not_found');
+    if (raw === 'Player left the game') return t('server.player_left');
+    if (raw === 'Server stopped') return t('server.server_stopped');
+    return raw;
+  }
+
+  function formatStatusDescriptor(desc) {
+    if (!desc) return '';
+    if (desc.kind === 'key') {
+      return t(desc.key, desc.params);
+    }
+    if (desc.kind === 'ws_closed') {
+      var translatedReason = desc.reason ? translateServerText(desc.reason) : '';
+      return translatedReason
+        ? t('status.ws_closed_reason', { code: desc.code, reason: translatedReason })
+        : t('status.ws_closed', { code: desc.code });
+    }
+    if (desc.kind === 'server') {
+      var base = translateServerText(desc.raw);
+      return desc.appendInsecure ? (base + '\n' + t('status.insecure_append')) : base;
+    }
+    return String(desc.raw || '');
+  }
+
+  function setStatusDescriptor(desc, level) {
+    lastStatus = desc;
+    var text = formatStatusDescriptor(desc);
+    statusEl.textContent = text;
+    logEvent(text.replace(/\n/g, ' | '), level || 'info');
+  }
+
   function show(message, level) {
-    statusEl.textContent = message;
-    logEvent(message.replace(/\n/g, ' | '), level || 'info');
+    setStatusDescriptor({ kind: 'raw', raw: message }, level);
+  }
+
+  function showKey(key, params, level) {
+    setStatusDescriptor({ kind: 'key', key: key, params: params || null }, level);
+  }
+
+  function refreshStatusText() {
+    if (lastStatus) {
+      statusEl.textContent = formatStatusDescriptor(lastStatus);
+    }
   }
 
   // --- Deterministic Pixel Steve Avatar ---
@@ -499,7 +883,7 @@
     wsState = 'connecting';
     allowReconnect = true;
     updateUiState();
-    show('Connecting to voice server...');
+    showKey('status.connecting_ws');
 
     ws = new WebSocket(wsUrlForSession(sessionId));
     ws.binaryType = 'arraybuffer';
@@ -513,16 +897,16 @@
       sendMicState(false);
       requestServerPlayers();
       if (!secureContext) {
-        show('Connected (listen only — https:// or localhost required for mic).', 'warn');
+        showKey('status.connected_insecure', null, 'warn');
         updateUiState();
         return;
       }
       if (!browserSupported) {
-        show('Connected (listen only — browser lacks recording support).', 'warn');
+        showKey('status.connected_unsupported', null, 'warn');
         updateUiState();
         return;
       }
-      show('Connected to Voice Web Bridge.');
+      showKey('status.connected');
       maybeAutoStartMicOnConnect();
       updateUiState();
     };
@@ -549,20 +933,26 @@
         allowReconnect = false;
       }
 
-      var msg = 'Closed (' + code + ')' + (reason ? ': ' + reason : '');
-      show(msg, code === 1000 ? 'warn' : 'error');
+      setStatusDescriptor(
+        { kind: 'ws_closed', code: code, reason: reason },
+        code === 1000 ? 'warn' : 'error'
+      );
       updateUiState();
 
       if (allowReconnect && reconnectAttempt < 5) {
         var delayMs = Math.min(10000, 1500 * Math.pow(2, reconnectAttempt));
         reconnectAttempt++;
-        logEvent('Reconnecting in ' + Math.round(delayMs / 1000) + 's (attempt ' + reconnectAttempt + '/5)...', 'warn');
+        logEvent(t('status.reconnecting', {
+          seconds: Math.round(delayMs / 1000),
+          attempt: reconnectAttempt,
+          max: 5
+        }), 'warn');
         reconnectTimer = setTimeout(connectWebSocket, delayMs);
       }
     };
 
     ws.onerror = function () {
-      show('WebSocket error — is the voice server running?', 'error');
+      showKey('status.ws_error', null, 'error');
       updateUiState();
     };
   }
@@ -640,7 +1030,7 @@
       return;
     }
 
-    var text = msg.message ? msg.message : JSON.stringify(msg);
+    var rawText = msg.message ? String(msg.message) : JSON.stringify(msg);
     if (typeof msg.message === 'string') {
       var m = msg.message.match(/^Connected as (.+)$/);
       if (m && m[1]) {
@@ -649,10 +1039,10 @@
         drawPixelAvatar(selfAvatarCanvas, playerName);
       }
     }
-    if (!secureContext) {
-      text += '\nMicrophone unavailable: serve this page over https:// (or localhost).';
-    }
-    show(text, msg.type === 'error' ? 'error' : 'ok');
+    setStatusDescriptor(
+      { kind: 'server', raw: rawText, appendInsecure: !secureContext },
+      msg.type === 'error' ? 'error' : 'ok'
+    );
     updateUiState();
   }
 
@@ -663,9 +1053,6 @@
   }
 
   function maybeAutoStartMicOnConnect() {
-    if (settings.audio.micMuted && settings.audio.micMuteMode === 'release') {
-      return;
-    }
     if (micStream && captureCtx) return;
     if (navigator.permissions && navigator.permissions.query) {
       try {
@@ -689,7 +1076,7 @@
     packetParts = [];
     encoderWorker = new Worker(ENCODER_WORKER_PATH);
     encoderWorker.onerror = function (e) {
-      show('Encoder worker error: ' + (e && e.message ? e.message : 'unknown'), 'error');
+      showKey('status.encoder_error', { error: (e && e.message ? e.message : 'unknown') }, 'error');
     };
     encoderWorker.onmessage = function (e) {
       var data = e.data;
@@ -756,14 +1143,6 @@
     updateUiState();
   }
 
-  function applyTrackEnabledState() {
-    if (!micStream) return;
-    var shouldEnableTrack = !(settings.audio.micMuted && settings.audio.micMuteMode === 'track');
-    micStream.getAudioTracks().forEach(function (t) {
-      t.enabled = shouldEnableTrack;
-    });
-  }
-
   function applyMicGain() {
     if (micGainNode) {
       micGainNode.gain.value = clamp(settings.audio.micGain, 0, 200) / 100;
@@ -810,8 +1189,8 @@
       }
       micStream = stream;
       micPermissionState = 'granted';
-      micErrorHint = '';
-      applyTrackEnabledState();
+      micErrorKey = '';
+      micErrorParams = null;
 
       captureCtx = new AC();
       var proceed = function () {
@@ -878,7 +1257,7 @@
         micProcessor.connect(muteTap);
         muteTap.connect(captureCtx.destination);
 
-        show('Microphone active — Voice active.', 'ok');
+        showKey('status.mic_active', null, 'ok');
         refreshDevices();
         updateUiState();
       };
@@ -890,25 +1269,28 @@
       }
     }).catch(function (err) {
       var name = err && err.name ? err.name : '';
-      var hint;
+      var errKey;
+      var errParams = null;
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
         micPermissionState = 'denied';
-        hint = 'Microphone permission was not granted. Allow the microphone in browser site settings, then click Enable Microphone.';
+        errKey = 'status.mic_err_denied';
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         micPermissionState = 'error';
-        hint = 'No microphone found. Connect a microphone and retry.';
+        errKey = 'status.mic_err_not_found';
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
         micPermissionState = 'error';
-        hint = 'Microphone is busy in another application. Close it and retry.';
+        errKey = 'status.mic_err_busy';
       } else if (name === 'OverconstrainedError') {
         micPermissionState = 'error';
-        hint = 'Selected microphone does not support requested settings. Pick another device.';
+        errKey = 'status.mic_err_overconstrained';
       } else {
         micPermissionState = 'error';
-        hint = 'Microphone error: ' + (err && err.message ? err.message : err);
+        errKey = 'status.mic_err_generic';
+        errParams = { error: (err && err.message ? err.message : err) };
       }
-      micErrorHint = hint;
-      show(hint, 'error');
+      micErrorKey = errKey;
+      micErrorParams = errParams;
+      showKey(errKey, errParams, 'error');
       updateUiState();
     });
   }
@@ -938,18 +1320,37 @@
     if (!devices.length) {
       var emptyOpt = document.createElement('option');
       emptyOpt.value = 'default';
-      emptyOpt.textContent = 'Default Device';
+      emptyOpt.setAttribute('data-device-fallback', 'default');
+      emptyOpt.textContent = t('devices.default_device');
       sel.appendChild(emptyOpt);
       return;
     }
     devices.forEach(function (d, idx) {
       var opt = document.createElement('option');
       opt.value = d.deviceId || 'default';
-      opt.textContent = d.label || ('Device ' + (idx + 1));
+      if (d.label) {
+        opt.textContent = d.label;
+      } else {
+        opt.setAttribute('data-device-index', String(idx + 1));
+        opt.textContent = t('devices.numbered_device', { index: idx + 1 });
+      }
       sel.appendChild(opt);
     });
     var match = devices.some(function (d) { return (d.deviceId || 'default') === preferred; });
     sel.value = match ? preferred : (devices[0].deviceId || 'default');
+  }
+
+  function refreshDeviceFallbackLabels() {
+    [micSel, speakerSel].forEach(function (sel) {
+      if (!sel) return;
+      sel.querySelectorAll('option[data-device-fallback="default"]').forEach(function (opt) {
+        opt.textContent = t('devices.default_device');
+      });
+      sel.querySelectorAll('option[data-device-index]').forEach(function (opt) {
+        var idx = opt.getAttribute('data-device-index');
+        opt.textContent = t('devices.numbered_device', { index: idx });
+      });
+    });
   }
 
   function applySavedSpeakerSink() {
@@ -1064,7 +1465,7 @@
     if (pref.nickname) return pref.nickname;
     if (serverPlayers[uuid] && serverPlayers[uuid].name) return serverPlayers[uuid].name;
     if (pref.serverName) return pref.serverName;
-    return 'Player ' + uuid.slice(0, 8);
+    return t('players.fallback_name', { id: uuid.slice(0, 8) });
   }
 
   function applySpeakerGain(uuid) {
@@ -1199,7 +1600,7 @@
       badges.push({ text: 'WEB', cls: 'mod-badge--web' });
     }
     if (!badges.length) {
-      badges.push({ text: entry.voice ? 'VOICE' : 'NO VOICE', cls: 'mod-badge--none' });
+      badges.push({ text: entry.voice ? t('players.badge_voice') : t('players.badge_no_voice'), cls: 'mod-badge--none' });
     }
     return badges;
   }
@@ -1217,7 +1618,9 @@
 
     speakerCountBadge.textContent = String(allEntries.length);
     if (playersSummaryEl) {
-      playersSummaryEl.textContent = 'Online: ' + totalOnline + ' • Voice: ' + totalVoice + (totalSpeaking ? (' • Speaking: ' + totalSpeaking) : '');
+      playersSummaryEl.textContent = totalSpeaking
+        ? t('players.summary_speaking', { online: totalOnline, voice: totalVoice, speaking: totalSpeaking })
+        : t('players.summary', { online: totalOnline, voice: totalVoice });
     }
 
     var query = (playerSearchQuery || '').trim().toLowerCase();
@@ -1235,10 +1638,12 @@
     });
 
     if (!filtered.length) {
-      var emptyMsg = allEntries.length
-        ? 'No players match the current search/filter.'
-        : 'No other players online on the server yet. Online players will appear here automatically once connected.';
-      speakersListEl.innerHTML = '<div class="empty-state">' + emptyMsg + '</div>';
+      var emptyMsg = allEntries.length ? t('players.empty_filter') : t('players.empty_server');
+      speakersListEl.innerHTML = '';
+      var emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+      emptyDiv.textContent = emptyMsg;
+      speakersListEl.appendChild(emptyDiv);
       renderOverlaySpeakers();
       return;
     }
@@ -1277,14 +1682,14 @@
       var nameSpan = document.createElement('span');
       nameSpan.className = 'speaker-name';
       nameSpan.textContent = getSpeakerDisplayName(uuid);
-      nameSpan.title = 'Click to set local alias';
+      nameSpan.title = t('players.alias_title');
       nameSpan.style.cursor = 'pointer';
       nameSpan.onclick = function () {
         var inp = document.createElement('input');
         inp.type = 'text';
         inp.className = 'speaker-name-input';
         inp.value = pref.nickname || '';
-        inp.placeholder = entry.name || ('Player ' + uuid.slice(0, 8));
+        inp.placeholder = entry.name || t('players.fallback_name', { id: uuid.slice(0, 8) });
         var commit = function () {
           pref.nickname = inp.value.trim();
           saveSpeakerPrefs();
@@ -1311,7 +1716,7 @@
         var speakTag = document.createElement('span');
         speakTag.className = 'key-chip';
         speakTag.style.color = '#55ff55';
-        speakTag.textContent = 'SPEAKING';
+        speakTag.textContent = t('players.speaking_tag');
         nameRow.appendChild(speakTag);
       }
 
@@ -1345,7 +1750,7 @@
       resetBtn.type = 'button';
       resetBtn.className = 'mc-btn mc-btn--xs';
       resetBtn.textContent = '100%';
-      resetBtn.title = 'Reset player volume to 100%';
+      resetBtn.title = t('players.reset_one_title');
       resetBtn.disabled = pref.volume === 100;
       resetBtn.onclick = function () {
         pref.volume = 100;
@@ -1370,7 +1775,7 @@
       var muteBtn = document.createElement('button');
       muteBtn.type = 'button';
       muteBtn.className = 'mc-btn mc-btn--xs ' + (pref.muted ? 'mc-btn--red' : 'mc-btn--green');
-      muteBtn.textContent = pref.muted ? 'MUTED' : 'MUTE';
+      muteBtn.textContent = pref.muted ? t('players.muted') : t('players.mute');
       muteBtn.onclick = function () {
         pref.muted = !pref.muted;
         applySpeakerGain(uuid);
@@ -1395,7 +1800,7 @@
       return knownSpeakers[uuid].speaking && !getSpeakerPref(uuid).muted;
     });
 
-    if (settings.overlay.style !== 'hud' || !settings.overlay.showSpeakers || !active.length) {
+    if (!settings.overlay.showSpeakers || !active.length) {
       ovSpeakersEl.classList.add('hidden');
       ovSpeakersEl.innerHTML = '';
       return;
@@ -1554,18 +1959,11 @@
     settings.audio.micMuted = !settings.audio.micMuted;
     if (settings.audio.micMuted) {
       playUiCue('mic-off');
-      if (settings.audio.micMuteMode === 'release') {
-        stopCapture();
-      } else {
-        applyTrackEnabledState();
-        syncTransmissionStop(false);
-      }
+      syncTransmissionStop(false);
     } else {
       playUiCue('mic-on');
       if (!micStream && secureContext && browserSupported) {
         startCapture(settings.audio.micDeviceId);
-      } else {
-        applyTrackEnabledState();
       }
     }
     saveSettings();
@@ -1578,14 +1976,11 @@
     settings.audio.deafened = !settings.audio.deafened;
     if (settings.audio.deafened && settings.audio.muteMicOnDeafen && !settings.audio.micMuted) {
       settings.audio.micMuted = true;
-      if (settings.audio.micMuteMode === 'release') stopCapture();
-      else applyTrackEnabledState();
+      syncTransmissionStop(false);
     } else if (!settings.audio.deafened && settings.audio.muteMicOnDeafen && settings.audio.micMuted) {
       settings.audio.micMuted = false;
-      if (!micStream && secureContext && browserSupported && settings.audio.micMuteMode !== 'release') {
+      if (!micStream && secureContext && browserSupported) {
         startCapture(settings.audio.micDeviceId);
-      } else {
-        applyTrackEnabledState();
       }
     }
     applyVolume();
@@ -1602,9 +1997,9 @@
     if (!browserSupported) {
       return {
         key: 'error',
-        title: 'UNSUPPORTED BROWSER',
-        sub: 'WebRTC + WebAssembly + Workers required',
-        ovLine: 'UNSUPPORTED',
+        title: t('hero.unsupported_title'),
+        sub: t('hero.unsupported_sub'),
+        ovLine: t('hero.unsupported_ov'),
         icon: 'px-plug-off',
         speaking: false
       };
@@ -1612,9 +2007,9 @@
     if (!secureContext) {
       return {
         key: 'error',
-        title: 'LISTEN ONLY (HTTP)',
-        sub: 'Serve over https:// or localhost for mic',
-        ovLine: 'LISTEN ONLY',
+        title: t('hero.insecure_title'),
+        sub: t('hero.insecure_sub'),
+        ovLine: t('hero.insecure_ov'),
         icon: 'px-mic-off',
         speaking: false
       };
@@ -1622,9 +2017,9 @@
     if (wsState === 'disconnected') {
       return {
         key: 'error',
-        title: 'DISCONNECTED',
-        sub: sessionId ? 'Not connected to voice server' : 'Missing session ID',
-        ovLine: 'OFFLINE',
+        title: t('hero.disconnected_title'),
+        sub: sessionId ? t('hero.disconnected_sub') : t('hero.missing_id_sub'),
+        ovLine: t('hero.disconnected_ov'),
         icon: 'px-plug-off',
         speaking: false
       };
@@ -1632,9 +2027,9 @@
     if (a.deafened) {
       return {
         key: 'deafened',
-        title: 'DEAFENED',
-        sub: a.micMuted ? 'Output & microphone muted' : 'Speaker output muted',
-        ovLine: 'DEAFENED',
+        title: t('hero.deafened_title'),
+        sub: a.micMuted ? t('hero.deafened_both_sub') : t('hero.deafened_out_sub'),
+        ovLine: t('hero.deafened_ov'),
         icon: 'px-headphones-off',
         speaking: false
       };
@@ -1643,11 +2038,11 @@
       var triggerInfo = getIngameTriggerInfo(a.ingameTrigger);
       return {
         key: 'muted',
-        title: 'MIC OFF (MUTED)',
+        title: t('hero.muted_title'),
         sub: triggerInfo.chip
-          ? ('Press ' + triggerInfo.label + ' in Minecraft or click Mic')
-          : 'Click Mic or run /mic in Minecraft to unmute',
-        ovLine: 'MIC OFF',
+          ? t('hero.muted_keybind_sub', { trigger: triggerInfo.label })
+          : t('hero.muted_default_sub'),
+        ovLine: t('hero.muted_ov'),
         icon: 'px-mic-off',
         speaking: false
       };
@@ -1656,18 +2051,18 @@
       if (micPermissionState === 'denied' || micPermissionState === 'error') {
         return {
           key: 'error',
-          title: 'MIC BLOCKED',
-          sub: 'Check browser permission and retry',
-          ovLine: 'MIC ERROR',
+          title: t('hero.blocked_title'),
+          sub: t('hero.blocked_sub'),
+          ovLine: t('hero.blocked_ov'),
           icon: 'px-mic-off',
           speaking: false
         };
       }
       return {
         key: 'waiting',
-        title: 'CLICK TO ENABLE MIC',
-        sub: 'Browser requires a click to prompt mic access',
-        ovLine: 'ENABLE MIC',
+        title: t('hero.click_enable_title'),
+        sub: t('hero.click_enable_sub'),
+        ovLine: t('hero.click_enable_ov'),
         icon: 'px-mic',
         speaking: false
       };
@@ -1676,9 +2071,9 @@
       var testActive = wasTransmitting;
       return {
         key: testActive ? 'speaking' : 'ready',
-        title: testActive ? 'MIC TEST (SPEAKING)' : 'MIC TEST ACTIVE',
-        sub: 'Local loopback only — not sent to server',
-        ovLine: testActive ? 'TEST: SPEAKING' : 'MIC TEST',
+        title: testActive ? t('hero.test_speaking_title') : t('hero.test_active_title'),
+        sub: t('hero.test_sub'),
+        ovLine: testActive ? t('hero.test_speaking_ov') : t('hero.test_active_ov'),
         icon: testActive ? 'px-mic-speaking' : 'px-mic',
         speaking: testActive
       };
@@ -1686,9 +2081,9 @@
     if (wsState !== 'connected') {
       return {
         key: 'waiting',
-        title: 'CONNECTING...',
-        sub: 'Waiting for voice server handshake',
-        ovLine: 'CONNECTING',
+        title: t('hero.connecting_title'),
+        sub: t('hero.connecting_sub'),
+        ovLine: t('hero.connecting_ov'),
         icon: 'px-mic',
         speaking: false
       };
@@ -1696,9 +2091,9 @@
     if (wasTransmitting) {
       return {
         key: 'speaking',
-        title: 'SPEAKING',
-        sub: 'Voice transmitting to nearby players',
-        ovLine: 'SPEAKING',
+        title: t('hero.speaking_title'),
+        sub: t('hero.speaking_sub'),
+        ovLine: t('hero.speaking_ov'),
         icon: 'px-mic-speaking',
         speaking: true
       };
@@ -1706,18 +2101,18 @@
     if (a.vadThresholdDb <= -95) {
       return {
         key: 'ready',
-        title: 'MIC ON (OPEN)',
-        sub: 'Open microphone active',
-        ovLine: 'MIC ON',
+        title: t('hero.open_mic_title'),
+        sub: t('hero.open_mic_sub'),
+        ovLine: t('hero.open_mic_ov'),
         icon: 'px-mic',
         speaking: false
       };
     }
     return {
       key: 'ready',
-      title: 'VOICE READY',
-      sub: 'Threshold: ' + a.vadThresholdDb + ' dB',
-      ovLine: 'MIC READY',
+      title: t('hero.voice_ready_title'),
+      sub: t('hero.voice_ready_sub', { db: a.vadThresholdDb }),
+      ovLine: t('hero.voice_ready_ov'),
       icon: 'px-mic',
       speaking: false
     };
@@ -1735,26 +2130,23 @@
     heroStateTitle.textContent = st.title;
     heroStateSub.textContent = st.sub;
 
-    // Primary Mic On/Off button
-    btnMicToggle.classList.toggle('hidden', !a.micButtonVisible);
+    // Primary Mic On/Off button (always shown)
     btnMicToggle.className = 'mc-btn action-btn ' + (a.micMuted ? 'mc-btn--red' : ('mc-btn--green' + (st.speaking ? ' is-speaking' : '')));
-    if (!a.micButtonVisible) btnMicToggle.classList.add('hidden');
     setSvgHref(btnMicIcon, a.micMuted ? 'px-mic-off' : (st.speaking ? 'px-mic-speaking' : 'px-mic'));
-    btnMicStateText.textContent = a.micMuted ? 'OFF' : 'ON';
-    btnMicSub.textContent = a.micMuted ? 'Muted (click to enable)' : (st.speaking ? 'Transmitting...' : 'Active (click to mute)');
+    btnMicStateText.textContent = a.micMuted ? t('common.off') : t('common.on');
+    btnMicSub.textContent = a.micMuted
+      ? t('controls.mic_muted_sub')
+      : (st.speaking ? t('controls.mic_transmitting_sub') : t('controls.mic_active_sub'));
     btnMicKey.textContent = triggerInfo.chip;
     btnMicKey.classList.toggle('hidden', !triggerInfo.chip);
 
     // Overlay visuals
-    overlayEl.classList.remove('state-speaking', 'state-ready', 'state-waiting', 'state-muted', 'state-deafened', 'state-error', 'is-speaking', 'is-dimmed');
+    overlayEl.classList.remove('state-speaking', 'state-ready', 'state-waiting', 'state-muted', 'state-deafened', 'state-error', 'is-speaking');
     overlayEl.classList.add('state-' + st.key);
     if (st.speaking) overlayEl.classList.add('is-speaking');
-    if (ov.dimWhenIdle && !st.speaking && !a.micMuted && !a.deafened) {
-      overlayEl.classList.add('is-dimmed');
-    }
 
     setSvgHref(ovMicSvg, st.icon);
-    if (ov.style === 'icon' || !ov.showLabel) {
+    if (!ov.showLabel) {
       ovStateLine.classList.add('hidden');
     } else {
       ovStateLine.classList.remove('hidden');
@@ -1762,16 +2154,16 @@
       ovStateLine.textContent = showMcHint ? (st.ovLine + ' [' + triggerInfo.chip + ']') : st.ovLine;
     }
 
-    if (ov.style === 'icon' || !ov.showPlayerName) {
+    if (!ov.showPlayerName) {
       ovSubLine.classList.add('hidden');
     } else {
       ovSubLine.classList.remove('hidden');
-      ovSubLine.textContent = hasPlayerIdentity ? playerName : (wsState === 'connected' ? 'Connected' : 'Voice Web Bridge');
+      ovSubLine.textContent = hasPlayerIdentity ? playerName : (wsState === 'connected' ? t('overlay.connected_sub') : 'Voice Web Bridge');
     }
 
     // Overlay quick mic button
     ovBtnMic.className = 'mc-btn mc-btn--xs ' + (a.micMuted ? 'mc-btn--red' : ('mc-btn--green' + (st.speaking ? ' is-speaking' : '')));
-    ovBtnMic.textContent = a.micMuted ? 'Mic: OFF' : 'Mic: ON';
+    ovBtnMic.textContent = t('overlay.mic_btn', { state: a.micMuted ? t('common.off') : t('common.on') });
   }
 
   function paintMeters() {
@@ -1781,8 +2173,10 @@
 
     heroMeterFill.style.width = pct + '%';
     heroMeterFill.className = 'meter-fill' + (active ? ' is-active' : (muted && pct > 1 ? ' is-preview' : ''));
-    heroMeterDb.textContent = Math.round(currentDb) + ' dB';
-    heroMeterLabel.textContent = muted ? 'Input Level (Muted)' : (active ? 'Transmitting' : 'Input Level');
+    heroMeterDb.textContent = t('unit.db', { value: Math.round(currentDb) });
+    heroMeterLabel.textContent = muted
+      ? t('meter.input_muted')
+      : (active ? t('meter.transmitting') : t('meter.input_level'));
 
     vadMeterFill.style.width = pct + '%';
     vadMeterFill.className = 'meter-fill' + (currentDb >= settings.audio.vadThresholdDb && !muted ? ' is-active' : ' is-preview');
@@ -1791,7 +2185,7 @@
   }
 
   function setToggleButtonUi(btn, on, onLabel, offLabel) {
-    btn.textContent = on ? (onLabel || 'ON') : (offLabel || 'OFF');
+    btn.textContent = on ? (onLabel || t('common.on')) : (offLabel || t('common.off'));
     btn.classList.remove('mc-btn--green', 'mc-btn--red');
     btn.classList.add(on ? 'mc-btn--green' : 'mc-btn--red');
   }
@@ -1809,38 +2203,10 @@
 
   function applyOverlayConfig() {
     var ov = settings.overlay;
-    var showOverlay = pipWindow ? true : (overlayFocusMode ? true : ov.enabled);
+    var showOverlay = !!(pipWindow || overlayFocusMode);
     overlayEl.classList.toggle('hidden', !showOverlay);
 
-    overlayEl.classList.remove(
-      'style-icon', 'style-badge', 'style-hud',
-      'theme-svc-dark', 'theme-mc-stone', 'theme-transparent', 'theme-high-contrast',
-      'pos-top-left', 'pos-top-right', 'pos-bottom-left', 'pos-bottom-right', 'pos-custom',
-      'is-locked'
-    );
-    overlayEl.classList.add('style-' + ov.style);
-    overlayEl.classList.add('theme-' + ov.theme);
-    overlayEl.classList.add('pos-' + ov.position);
-    if (ov.lockPosition) overlayEl.classList.add('is-locked');
-
-    overlayEl.style.setProperty('--overlay-scale', String(clamp(ov.scale, 75, 200) / 100));
-    overlayEl.style.setProperty('--overlay-opacity', String(clamp(ov.opacity, 25, 100) / 100));
-
-    if (!pipWindow && ov.position === 'custom') {
-      var clampedX = clamp(ov.customX, 8, Math.max(8, window.innerWidth - 72));
-      var clampedY = clamp(ov.customY, 8, Math.max(8, window.innerHeight - 56));
-      overlayEl.style.left = clampedX + 'px';
-      overlayEl.style.top = clampedY + 'px';
-      overlayEl.style.right = '';
-      overlayEl.style.bottom = '';
-    } else {
-      overlayEl.style.left = '';
-      overlayEl.style.top = '';
-      overlayEl.style.right = '';
-      overlayEl.style.bottom = '';
-    }
-
-    ovMeterEl.classList.toggle('hidden', ov.style === 'icon' || !ov.showMeter);
+    ovMeterEl.classList.toggle('hidden', !ov.showMeter);
     ovControlsEl.classList.toggle('hidden', !ov.showControls);
     renderOverlaySpeakers();
   }
@@ -1848,30 +2214,34 @@
   function updateUiState() {
     var a = settings.audio;
     var ov = settings.overlay;
+    var onText = t('common.on');
+    var offText = t('common.off');
 
     // Header connection + identity
     identityPillEl.classList.toggle('hidden', !hasPlayerIdentity);
-    playerNameTextEl.textContent = playerName;
+    playerNameTextEl.textContent = hasPlayerIdentity ? playerName : t('header.player_default');
 
     connBadgeEl.className = 'conn-badge conn-badge--' + (wsState === 'connected' ? 'connected' : (wsState === 'connecting' ? 'connecting' : 'disconnected'));
-    connBadgeTextEl.textContent = wsState === 'connected' ? 'CONNECTED' : (wsState === 'connecting' ? 'CONNECTING' : (sessionId ? 'OFFLINE' : 'NO SESSION'));
+    connBadgeTextEl.textContent = wsState === 'connected'
+      ? t('header.conn_connected')
+      : (wsState === 'connecting' ? t('header.conn_connecting') : (sessionId ? t('header.conn_offline') : t('header.conn_no_session')));
     btnReconnect.classList.toggle('hidden', !sessionId || wsState === 'connected' || wsState === 'connecting');
 
-    sessionMetaEl.textContent = 'Session: ' + (sessionId || 'none');
+    sessionMetaEl.textContent = t('log.session_meta', { id: sessionId || t('log.session_none') });
 
     // Banners
     bannerMissingId.classList.toggle('hidden', !!sessionId);
     bannerInsecure.classList.toggle('hidden', secureContext);
-    var needsPermBanner = secureContext && browserSupported && (!micStream || !captureCtx) && !(a.micMuted && a.micMuteMode === 'release');
+    var needsPermBanner = secureContext && browserSupported && (!micStream || !captureCtx);
     bannerPermission.classList.toggle('hidden', !needsPermBanner);
     if (micPermissionState === 'denied' || micPermissionState === 'error') {
-      bannerPermTitle.innerHTML = '<strong>Microphone unavailable.</strong>';
-      bannerPermHint.textContent = micErrorHint || 'Allow microphone permission and click Enable Microphone.';
-      btnEnableMicText.textContent = 'Retry Microphone';
+      bannerPermTitle.textContent = t('banner.perm_unavailable_title');
+      bannerPermHint.textContent = micErrorKey ? t(micErrorKey, micErrorParams) : t('banner.perm_unavailable_hint');
+      btnEnableMicText.textContent = t('banner.retry_mic_btn');
     } else {
-      bannerPermTitle.innerHTML = '<strong>Microphone permission needed.</strong>';
-      bannerPermHint.textContent = 'Click Enable Microphone so the browser shows the audio permission prompt.';
-      btnEnableMicText.textContent = 'Enable Microphone';
+      bannerPermTitle.textContent = t('banner.perm_needed_title');
+      bannerPermHint.textContent = t('banner.perm_needed_hint');
+      btnEnableMicText.textContent = t('banner.enable_mic_btn');
     }
     updatePlaybackResumeBanner();
 
@@ -1884,40 +2254,39 @@
     // Deafen button
     btnDeafen.className = 'mc-btn action-btn ' + (a.deafened ? 'mc-btn--red' : '');
     setSvgHref(btnDeafenIcon, a.deafened ? 'px-headphones-off' : 'px-headphones');
-    btnDeafenStateText.textContent = a.deafened ? 'OFF' : 'ON';
-    btnDeafenSub.textContent = a.deafened ? 'Deafened (click to unmute)' : 'Click to deafen';
+    btnDeafenStateText.textContent = a.deafened ? offText : onText;
+    btnDeafenSub.textContent = a.deafened ? t('controls.deafened_sub') : t('controls.deafen_sub');
 
     // Threshold / VAD UI
     vadThresholdEl.value = String(a.vadThresholdDb);
-    vadThresholdValEl.textContent = a.vadThresholdDb <= -95 ? (a.vadThresholdDb + ' dB (Open Mic)') : (a.vadThresholdDb + ' dB');
+    vadThresholdValEl.textContent = a.vadThresholdDb <= -95
+      ? t('vad.threshold_open', { db: a.vadThresholdDb })
+      : t('unit.db', { value: a.vadThresholdDb });
     var threshPct = clamp(a.vadThresholdDb + 100, 0, 100);
     vadThresholdMark.style.left = threshPct + '%';
     heroMeterThreshold.style.left = threshPct + '%';
     heroMeterThreshold.classList.toggle('hidden', a.vadThresholdDb <= -95);
     vadHoldoverEl.value = String(a.vadHoldoverMs);
-    vadHoldoverValEl.textContent = a.vadHoldoverMs + ' ms';
+    vadHoldoverValEl.textContent = t('unit.ms', { value: a.vadHoldoverMs });
 
-    // Mic Off & Audio Processing controls
-    micMuteModeSel.value = a.micMuteMode;
+    // Mic & Audio Processing controls
+    setToggleButtonUi(btnMicTest, micTestEnabled, t('devices.testing'), offText);
+    setToggleButtonUi(toggleMuteOnDeafen, a.muteMicOnDeafen, onText, offText);
+    setToggleButtonUi(toggleUiSounds, a.uiSounds, onText, offText);
 
-    setToggleButtonUi(btnMicTest, micTestEnabled, 'TESTING', 'OFF');
-    setToggleButtonUi(toggleMicBtnVisible, a.micButtonVisible, 'ON', 'OFF');
-    setToggleButtonUi(toggleMuteOnDeafen, a.muteMicOnDeafen, 'ON', 'OFF');
-    setToggleButtonUi(toggleUiSounds, a.uiSounds, 'ON', 'OFF');
-
-    toggleEcBtn.textContent = 'Echo Cancel: ' + (a.echoCancellation ? 'ON' : 'OFF');
+    toggleEcBtn.textContent = t('processing.ec_btn', { state: a.echoCancellation ? onText : offText });
     toggleEcBtn.classList.toggle('mc-btn--green', a.echoCancellation);
-    toggleNsBtn.textContent = 'Noise Supp: ' + (a.noiseSuppression ? 'ON' : 'OFF');
+    toggleNsBtn.textContent = t('processing.ns_btn', { state: a.noiseSuppression ? onText : offText });
     toggleNsBtn.classList.toggle('mc-btn--green', a.noiseSuppression);
-    toggleAgcBtn.textContent = 'Auto Gain: ' + (a.autoGainControl ? 'ON' : 'OFF');
+    toggleAgcBtn.textContent = t('processing.agc_btn', { state: a.autoGainControl ? onText : offText });
     toggleAgcBtn.classList.toggle('mc-btn--green', a.autoGainControl);
 
     // Minecraft Keybind controls (In-Game Server Sync)
     if (ingameSyncPill) {
       var hasIngame = wsState === 'connected' && !!serverCapabilities.ingame_mic;
       ingameSyncPill.textContent = hasIngame
-        ? 'Server Sync: READY'
-        : (wsState === 'connected' ? 'Server Sync: Update Plugin' : 'Server Sync: Offline');
+        ? t('keybind.sync_ready')
+        : (wsState === 'connected' ? t('keybind.sync_update') : t('keybind.sync_offline'));
       ingameSyncPill.className = 'sync-pill ' + (hasIngame ? 'sync-pill--ok' : 'sync-pill--warn');
     }
     var normalizedTrigger = normalizeIngameTrigger(a.ingameTrigger);
@@ -1927,83 +2296,22 @@
     }
 
     // Overlay Config Tab controls
-    setToggleButtonUi(toggleOverlayEnabled, ov.enabled, 'ON', 'OFF');
-    overlayStyleSel.value = ov.style;
-    overlayThemeSel.value = ov.theme;
-    overlayPositionSel.value = ov.position;
-    setToggleButtonUi(toggleOverlayLock, ov.lockPosition, 'LOCKED', 'FREE');
-    overlayScaleEl.value = String(ov.scale);
-    overlayScaleValEl.textContent = ov.scale + '%';
-    overlayOpacityEl.value = String(ov.opacity);
-    overlayOpacityValEl.textContent = ov.opacity + '%';
-
-    setToggleButtonUi(toggleOvLabel, ov.showLabel, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvName, ov.showPlayerName, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvControls, ov.showControls, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvMeter, ov.showMeter, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvKeys, ov.showKeyHints, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvSpeakers, ov.showSpeakers, 'ON', 'OFF');
-    setToggleButtonUi(toggleOvDim, ov.dimWhenIdle, 'ON', 'OFF');
+    setToggleButtonUi(toggleOvLabel, ov.showLabel, onText, offText);
+    setToggleButtonUi(toggleOvName, ov.showPlayerName, onText, offText);
+    setToggleButtonUi(toggleOvControls, ov.showControls, onText, offText);
+    setToggleButtonUi(toggleOvMeter, ov.showMeter, onText, offText);
+    setToggleButtonUi(toggleOvKeys, ov.showKeyHints, onText, offText);
+    setToggleButtonUi(toggleOvSpeakers, ov.showSpeakers, onText, offText);
 
     pipActiveNotice.classList.toggle('hidden', !pipWindow);
+    if (copyObsCopied) {
+      btnCopyObsUrl.textContent = t('overlay.copied');
+    }
 
     applyOverlayConfig();
     updateMicStateVisuals();
     updateObsUrlPreview();
   }
-
-  // --- Overlay Dragging ---
-
-  (function initOverlayDrag() {
-    var dragging = false;
-    var moved = false;
-    var startClientX = 0;
-    var startClientY = 0;
-    var startLeft = 0;
-    var startTop = 0;
-
-    overlayEl.addEventListener('pointerdown', function (e) {
-      if (pipWindow || settings.overlay.lockPosition) return;
-      if (e.button !== 0) return;
-      if (e.target && e.target.closest('button, input, select, a')) return;
-
-      var rect = overlayEl.getBoundingClientRect();
-      dragging = true;
-      moved = false;
-      startClientX = e.clientX;
-      startClientY = e.clientY;
-      startLeft = rect.left;
-      startTop = rect.top;
-      if (overlayEl.setPointerCapture) {
-        try { overlayEl.setPointerCapture(e.pointerId); } catch (err) {}
-      }
-    });
-
-    window.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      var dx = e.clientX - startClientX;
-      var dy = e.clientY - startClientY;
-      if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-      moved = true;
-      settings.overlay.position = 'custom';
-      settings.overlay.customX = clamp(Math.round(startLeft + dx), 8, Math.max(8, window.innerWidth - 72));
-      settings.overlay.customY = clamp(Math.round(startTop + dy), 8, Math.max(8, window.innerHeight - 56));
-      overlayPositionSel.value = 'custom';
-      applyOverlayConfig();
-    });
-
-    function endDrag() {
-      if (!dragging) return;
-      dragging = false;
-      if (moved) saveSettings();
-    }
-    window.addEventListener('pointerup', endDrag);
-    window.addEventListener('pointercancel', endDrag);
-  })();
-
-  window.addEventListener('resize', function () {
-    if (settings.overlay.position === 'custom') applyOverlayConfig();
-  });
 
   // --- Overlay Focus Mode & Document Picture-in-Picture ---
 
@@ -2028,7 +2336,7 @@
     }
 
     if (!('documentPictureInPicture' in window)) {
-      show('Pop-Out Always-on-Top window requires a Chromium browser (Chrome/Edge/Brave).', 'warn');
+      showKey('status.pip_unsupported', null, 'warn');
       return;
     }
 
@@ -2038,10 +2346,11 @@
     }).then(function (win) {
       pipWindow = win;
       var pipDoc = win.document;
+      pipDoc.documentElement.lang = htmlLangForLocale(currentLocale);
 
       var fontStyle = pipDoc.createElement('style');
-      var fontUrl = new URL('lib/PixelifySans.ttf', window.location.href).href;
-      fontStyle.textContent = "@font-face { font-family: 'Pixelify Sans'; src: url('" + fontUrl + "') format('truetype'); font-weight: 400 700; font-style: normal; }";
+      var fontUrl = new URL('lib/Roboto.ttf', window.location.href).href;
+      fontStyle.textContent = "@font-face { font-family: 'Roboto'; src: url('" + fontUrl + "') format('truetype'); font-weight: 100 900; font-style: normal; }";
       pipDoc.head.appendChild(fontStyle);
 
       var cssLink = pipDoc.createElement('link');
@@ -2049,7 +2358,7 @@
       cssLink.href = new URL('styles.css', window.location.href).href;
       pipDoc.head.appendChild(cssLink);
 
-      pipDoc.title = 'Voice Web Bridge Overlay';
+      pipDoc.title = t('overlay.pip_window_title');
       pipDoc.body.className = 'pip-window';
 
       var svgDefs = document.getElementById('svg-defs');
@@ -2063,9 +2372,9 @@
       });
 
       updateUiState();
-      logEvent('Popped out always-on-top overlay window.', 'ok');
+      logEvent(t('status.pip_opened'), 'ok');
     }).catch(function (err) {
-      show('Could not open popout window: ' + (err && err.message ? err.message : err), 'warn');
+      showKey('status.pip_failed', { error: (err && err.message ? err.message : err) }, 'warn');
     });
   }
 
@@ -2122,12 +2431,15 @@
   // Header & Popout buttons
   btnExitFocus.addEventListener('click', function () { setOverlayFocusMode(false); });
   btnPopout.addEventListener('click', openPopoutOverlay);
-  btnOverlayPopout.addEventListener('click', openPopoutOverlay);
-  ovBtnPopout.addEventListener('click', openPopoutOverlay);
   btnRecallPip.addEventListener('click', function () {
     if (pipWindow && !pipWindow.closed) pipWindow.close();
     dockOverlayBack();
   });
+  if (langSel) {
+    langSel.addEventListener('change', function () {
+      setLocale(langSel.value, true);
+    });
+  }
 
   // Primary Action Buttons (Hero Dock + Overlay Quick Controls)
   btnMicToggle.addEventListener('click', function () { toggleMicMute(false); });
@@ -2148,21 +2460,19 @@
   micSel.addEventListener('change', function () {
     settings.audio.micDeviceId = micSel.value || null;
     saveSettings();
-    if (micStream || !(settings.audio.micMuted && settings.audio.micMuteMode === 'release')) {
-      startCapture(settings.audio.micDeviceId);
-    }
+    startCapture(settings.audio.micDeviceId);
   });
   speakerSel.addEventListener('change', function () {
     settings.audio.speakerDeviceId = speakerSel.value || null;
     saveSettings();
     if (typeof outputEl.setSinkId !== 'function') {
-      show('This browser does not support speaker selection.', 'warn');
+      showKey('status.speaker_unsupported', null, 'warn');
       return;
     }
     outputEl.setSinkId(settings.audio.speakerDeviceId).then(function () {
       if (outputEl.paused) outputEl.play().catch(function () {});
     }).catch(function (err) {
-      show('Speaker change failed: ' + (err && err.message ? err.message : err), 'error');
+      showKey('status.speaker_failed', { error: (err && err.message ? err.message : err) }, 'error');
     });
   });
 
@@ -2196,23 +2506,7 @@
     updateUiState();
   });
 
-  // Mic Off & Audio Processing Config
-  micMuteModeSel.addEventListener('change', function () {
-    settings.audio.micMuteMode = micMuteModeSel.value;
-    if (settings.audio.micMuted && settings.audio.micMuteMode === 'release') {
-      stopCapture();
-    } else if (micStream) {
-      applyTrackEnabledState();
-    }
-    saveSettings();
-    updateUiState();
-  });
-
-  toggleMicBtnVisible.addEventListener('click', function () {
-    settings.audio.micButtonVisible = !settings.audio.micButtonVisible;
-    saveSettings();
-    updateUiState();
-  });
+  // Mic & Audio Processing Config
   toggleMuteOnDeafen.addEventListener('click', function () {
     settings.audio.muteMicOnDeafen = !settings.audio.muteMicOnDeafen;
     saveSettings();
@@ -2244,7 +2538,7 @@
     sendMicState(false);
     if (micStream) startCapture(settings.audio.micDeviceId);
     updateUiState();
-    logEvent('Audio & keybind settings reset to defaults.', 'info');
+    logEvent(t('status.audio_reset'), 'info');
   });
 
   // Minecraft In-Game Keybind Config Listener
@@ -2253,53 +2547,10 @@
     saveSettings();
     sendIngameTriggerConfig();
     updateUiState();
-    logEvent('Minecraft Mic On/Off keybind set to: ' + getIngameTriggerInfo(settings.audio.ingameTrigger).label, 'info');
+    logEvent(t('status.keybind_set', { label: getIngameTriggerInfo(settings.audio.ingameTrigger).label }), 'info');
   });
 
   // Overlay Config Listeners
-  toggleOverlayEnabled.addEventListener('click', function () {
-    settings.overlay.enabled = !settings.overlay.enabled;
-    saveSettings();
-    updateUiState();
-  });
-  overlayStyleSel.addEventListener('change', function () {
-    settings.overlay.style = overlayStyleSel.value;
-    saveSettings();
-    updateUiState();
-  });
-  overlayThemeSel.addEventListener('change', function () {
-    settings.overlay.theme = overlayThemeSel.value;
-    saveSettings();
-    updateUiState();
-  });
-  overlayPositionSel.addEventListener('change', function () {
-    settings.overlay.position = overlayPositionSel.value;
-    saveSettings();
-    updateUiState();
-  });
-  toggleOverlayLock.addEventListener('click', function () {
-    settings.overlay.lockPosition = !settings.overlay.lockPosition;
-    saveSettings();
-    updateUiState();
-  });
-  btnOverlayResetPos.addEventListener('click', function () {
-    settings.overlay.position = 'bottom-left';
-    settings.overlay.customX = 16;
-    settings.overlay.customY = 16;
-    saveSettings();
-    updateUiState();
-  });
-  overlayScaleEl.addEventListener('input', function () {
-    settings.overlay.scale = clamp(parseInt(overlayScaleEl.value, 10) || 100, 75, 200);
-    saveSettings();
-    updateUiState();
-  });
-  overlayOpacityEl.addEventListener('input', function () {
-    settings.overlay.opacity = clamp(parseInt(overlayOpacityEl.value, 10) || 95, 25, 100);
-    saveSettings();
-    updateUiState();
-  });
-
   function bindOvToggle(el, key) {
     el.addEventListener('click', function () {
       settings.overlay[key] = !settings.overlay[key];
@@ -2313,21 +2564,26 @@
   bindOvToggle(toggleOvMeter, 'showMeter');
   bindOvToggle(toggleOvKeys, 'showKeyHints');
   bindOvToggle(toggleOvSpeakers, 'showSpeakers');
-  bindOvToggle(toggleOvDim, 'dimWhenIdle');
 
   btnResetOverlay.addEventListener('click', function () {
     settings.overlay = defaultOverlaySettings();
     saveSettings();
     updateUiState();
-    logEvent('Overlay settings reset to defaults.', 'info');
+    logEvent(t('status.overlay_reset'), 'info');
   });
 
   btnCopyObsUrl.addEventListener('click', function () {
     var val = obsUrlInput.value;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(val).then(function () {
-        btnCopyObsUrl.textContent = 'Copied!';
-        setTimeout(function () { btnCopyObsUrl.textContent = 'Copy URL'; }, 1500);
+        copyObsCopied = true;
+        btnCopyObsUrl.textContent = t('overlay.copied');
+        if (copyObsTimer) clearTimeout(copyObsTimer);
+        copyObsTimer = setTimeout(function () {
+          copyObsCopied = false;
+          copyObsTimer = null;
+          btnCopyObsUrl.textContent = t('overlay.copy_url');
+        }, 1500);
       }).catch(function () {});
     } else {
       obsUrlInput.select();
@@ -2361,7 +2617,7 @@
     });
     saveSpeakerPrefs();
     renderSpeakersList(true);
-    logEvent('Reset all player volumes to 100%.', 'info');
+    logEvent(t('status.volumes_reset'), 'info');
   });
   btnClearLog.addEventListener('click', function () {
     eventLogEl.innerHTML = '';
@@ -2396,20 +2652,69 @@
     }
   }, 350);
 
+  function refreshAllTranslations() {
+    var htmlLang = htmlLangForLocale(currentLocale);
+    document.documentElement.lang = htmlLang;
+    document.title = t('page.title');
+    if (langSel) langSel.value = currentLocale;
+
+    applyDomTranslations(document);
+    if (pipWindow && !pipWindow.closed && pipWindow.document) {
+      pipWindow.document.documentElement.lang = htmlLang;
+      pipWindow.document.title = t('overlay.pip_window_title');
+      applyDomTranslations(pipWindow.document);
+    }
+
+    refreshDeviceFallbackLabels();
+    updateUiState();
+    paintMeters();
+    renderSpeakersList(true);
+    refreshStatusText();
+  }
+
+  function setLocale(nextLocale, persist) {
+    var matched = matchSupportedLocale(nextLocale) || 'en_US';
+    currentLocale = matched;
+    if (persist) {
+      try {
+        localStorage.setItem(STORAGE_LANG_KEY, currentLocale);
+      } catch (e) {}
+    }
+    if (langSel) langSel.value = currentLocale;
+    return loadLocaleFile(currentLocale).then(function () {
+      if (currentLocale === matched) {
+        refreshAllTranslations();
+      }
+    });
+  }
+
   // --- Initial Boot ---
   drawPixelAvatar(selfAvatarCanvas, playerName);
   applySavedSpeakerSink();
-  updateUiState();
+  refreshAllTranslations();
 
-  if (!browserSupported) {
-    show('This browser does not support recording (getUserMedia + WebAssembly + Workers required).', 'error');
-  } else if (!secureContext) {
-    show('Microphone unavailable: serve this page over https:// (or localhost). Playback still works.', 'warn');
+  var bootStarted = false;
+  function finishInitialBoot() {
+    if (bootStarted) return;
+    bootStarted = true;
+    refreshAllTranslations();
+
+    if (!browserSupported) {
+      showKey('status.boot_unsupported', null, 'error');
+    } else if (!secureContext) {
+      showKey('status.boot_insecure', null, 'warn');
+    }
+
+    if (sessionId) {
+      connectWebSocket();
+    } else {
+      showKey('status.boot_no_id', null, 'warn');
+    }
   }
 
-  if (sessionId) {
-    connectWebSocket();
-  } else {
-    show('No id parameter in URL. Open the link from game chat (?id=...) or paste a session ID above.', 'warn');
-  }
+  var bootFallbackTimer = setTimeout(finishInitialBoot, 1500);
+  loadLocaleFile(currentLocale).then(function () {
+    clearTimeout(bootFallbackTimer);
+    finishInitialBoot();
+  });
 })();

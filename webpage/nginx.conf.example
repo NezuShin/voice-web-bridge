@@ -31,7 +31,12 @@ server {
     index voicechat.html;
 
     location /lib/ {
-        # Vendored opus-recorder and Pixelify Sans font assets (served same-origin — workers require it)
+        # Vendored opus-recorder and Roboto font assets (served same-origin — workers require it)
+        try_files $uri =404;
+    }
+
+    location /lang/ {
+        # UI translation JSON files (en_US.json, ru_RU.json)
         try_files $uri =404;
     }
 

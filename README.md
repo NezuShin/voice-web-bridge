@@ -82,4 +82,4 @@ Voice Web Bridge is distributed under the **GNU General Public License v3.0** ([
 
 Copyright (c) 2026 nezushin. Based on [Voice Bridge](https://github.com/PfauMC/voice-bridge) — Copyright (c) 2026 PfauMC, originally licensed under the MIT License.
 
-All preserved upstream and third-party notices (PfauMC, bStats, Java-WebSocket, SLF4J, `opus-recorder` / Opus / Speex, and the `Pixelify Sans` SIL OFL 1.1 font) — along with GPLv3 Section 6 Corresponding Source details for release distributions — are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+All preserved upstream and third-party notices (PfauMC, bStats, Java-WebSocket, SLF4J, `opus-recorder` / Opus / Speex, and the `Roboto` SIL OFL 1.1 font) — along with GPLv3 Section 6 Corresponding Source details for release distributions — are documented in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

@@ -150,16 +150,16 @@ its build scripts and bundled `libopus`/`speex` C sources) available alongside t
 release (for example, by attaching the `opus-recorder` v8.0.5 source archive to
 the same release).
 
-### Pixelify Sans — SIL Open Font License 1.1 (OFL-1.1)
+### Roboto — SIL Open Font License 1.1 (OFL-1.1)
 
 File:
-- `webpage/lib/PixelifySans.ttf` (`PixelifySans[wght].ttf` from Google Fonts)
+- `webpage/lib/Roboto.ttf` (`Roboto[wdth,wght].ttf` from Google Fonts)
 
-Copyright 2021 The Pixelify Sans Project Authors
-(<https://github.com/eifetx/Pixelify-Sans>).
+Copyright 2021 The Roboto Project Authors
+(<https://github.com/googlefonts/roboto-3-classic>).
 
 Full license text is preserved verbatim in
-[webpage/lib/PixelifySans-LICENSE.txt](webpage/lib/PixelifySans-LICENSE.txt).
+[webpage/lib/Roboto-LICENSE.txt](webpage/lib/Roboto-LICENSE.txt).
 Per SIL OFL 1.1 Condition 5, the font software itself remains licensed exclusively
 under the SIL Open Font License 1.1 and is **not** relicensed under GPLv3.
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Voice Web Bridge - Proximity Voice Chat</title>
+  <title data-i18n="page.title">Voice Web Bridge - Proximity Voice Chat</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -155,10 +155,10 @@
 
   <!-- Overlay Focus Mode Floating Return Bar -->
   <div id="focus-exit-bar" class="focus-exit-bar">
-    <span class="field-hint">Overlay Focus Mode</span>
+    <span class="field-hint" data-i18n="focus.label">Overlay Focus Mode</span>
     <button type="button" id="btn-exit-focus" class="mc-btn mc-btn--xs mc-btn--primary">
       <svg class="px-icon"><use href="#px-focus"/></svg>
-      Exit Overlay Mode
+      <span data-i18n="focus.exit">Exit Overlay Mode</span>
     </button>
   </div>
 
@@ -172,31 +172,36 @@
             <svg class="px-icon px-icon--lg"><use href="#px-mic-speaking"/></svg>
           </div>
           <div>
-            <h1 class="brand-title">VOICE WEB BRIDGE</h1>
-            <div class="brand-subtitle">SIMPLE VOICE CHAT + PLASMO PROXIMITY WEB</div>
+            <h1 class="brand-title" data-i18n="header.brand_title">VOICE WEB BRIDGE</h1>
+            <div class="brand-subtitle" data-i18n="header.brand_subtitle">SIMPLE VOICE CHAT + PLASMO PROXIMITY WEB</div>
           </div>
         </div>
 
         <div class="header-actions">
-          <div id="identity-pill" class="identity-pill hidden" title="Connected Minecraft player">
+          <div id="identity-pill" class="identity-pill hidden" data-i18n-title="header.identity_title" title="Connected Minecraft player">
             <canvas id="self-avatar" class="player-head-canvas" width="8" height="8"></canvas>
-            <span id="player-name-text">Player</span>
+            <span id="player-name-text" data-i18n="header.player_default">Player</span>
           </div>
 
           <div id="conn-badge" class="conn-badge conn-badge--connecting">
             <span class="conn-dot"></span>
-            <span id="conn-badge-text">CONNECTING</span>
+            <span id="conn-badge-text" data-i18n="header.conn_connecting">CONNECTING</span>
           </div>
 
           <button type="button" id="btn-reconnect" class="mc-btn mc-btn--sm hidden">
             <svg class="px-icon"><use href="#px-refresh"/></svg>
-            Reconnect
+            <span data-i18n="header.reconnect">Reconnect</span>
           </button>
 
-          <button type="button" id="btn-popout-overlay" class="mc-btn mc-btn--sm mc-btn--aqua" title="Pop out always-on-top overlay window">
+          <button type="button" id="btn-popout-overlay" class="mc-btn mc-btn--sm mc-btn--aqua" data-i18n-title="header.popout_title" title="Pop out always-on-top overlay window">
             <svg class="px-icon"><use href="#px-popout"/></svg>
-            Pop Out
+            <span data-i18n="header.popout">Pop Out</span>
           </button>
+
+          <select id="lang-select" class="mc-select lang-select" data-i18n-title="header.lang_title" data-i18n-aria-label="header.lang_title" title="Interface language" aria-label="Interface language">
+            <option value="en_US">English</option>
+            <option value="ru_RU">Русский</option>
+          </select>
         </div>
       </header>
 
@@ -206,13 +211,13 @@
           <div class="mc-banner__content">
             <svg class="px-icon px-icon--lg"><use href="#px-warn"/></svg>
             <div>
-              <div><strong>No session ID in URL.</strong></div>
-              <div class="field-hint">Open the link from Minecraft chat (?id=...) or paste your session UUID below. Settings and local mic test still work!</div>
+              <div><strong data-i18n="banner.missing_id_title">No session ID in URL.</strong></div>
+              <div class="field-hint" data-i18n="banner.missing_id_hint">Open the link from Minecraft chat (?id=...) or paste your session UUID below. Settings and local mic test still work!</div>
             </div>
           </div>
           <div class="session-input-row">
-            <input type="text" id="manual-session-input" class="mc-input" style="width: 240px;" placeholder="Paste session UUID or URL...">
-            <button type="button" id="btn-manual-connect" class="mc-btn mc-btn--sm mc-btn--green">Connect</button>
+            <input type="text" id="manual-session-input" class="mc-input" style="width: 240px;" data-i18n-placeholder="banner.manual_session_placeholder" placeholder="Paste session UUID or URL...">
+            <button type="button" id="btn-manual-connect" class="mc-btn mc-btn--sm mc-btn--green" data-i18n="banner.connect_btn">Connect</button>
           </div>
         </div>
 
@@ -220,8 +225,8 @@
           <div class="mc-banner__content">
             <svg class="px-icon px-icon--lg"><use href="#px-warn"/></svg>
             <div>
-              <div><strong>Microphone unavailable on insecure HTTP.</strong></div>
-              <div class="field-hint">Browsers require https:// or localhost for getUserMedia. You can still hear nearby players.</div>
+              <div><strong data-i18n="banner.insecure_title">Microphone unavailable on insecure HTTP.</strong></div>
+              <div class="field-hint" data-i18n="banner.insecure_hint">Browsers require https:// or localhost for getUserMedia. You can still hear nearby players.</div>
             </div>
           </div>
         </div>
@@ -230,13 +235,13 @@
           <div class="mc-banner__content">
             <svg class="px-icon px-icon--lg"><use href="#px-mic"/></svg>
             <div>
-              <div id="banner-permission-title"><strong>Microphone permission needed.</strong></div>
-              <div id="banner-permission-hint" class="field-hint">Click Enable Microphone so the browser shows the audio permission prompt.</div>
+              <div><strong id="banner-permission-title" data-i18n="banner.perm_needed_title">Microphone permission needed.</strong></div>
+              <div id="banner-permission-hint" class="field-hint" data-i18n="banner.perm_needed_hint">Click Enable Microphone so the browser shows the audio permission prompt.</div>
             </div>
           </div>
           <button type="button" id="btn-enable-mic" class="mc-btn mc-btn--sm mc-btn--green">
             <svg class="px-icon"><use href="#px-mic"/></svg>
-            <span id="btn-enable-mic-text">Enable Microphone</span>
+            <span id="btn-enable-mic-text" data-i18n="banner.enable_mic_btn">Enable Microphone</span>
           </button>
         </div>
 
@@ -244,11 +249,11 @@
           <div class="mc-banner__content">
             <svg class="px-icon px-icon--lg"><use href="#px-headphones"/></svg>
             <div>
-              <div><strong>Browser paused audio playback.</strong></div>
-              <div class="field-hint">Click Resume Audio to hear nearby players.</div>
+              <div><strong data-i18n="banner.playback_paused_title">Browser paused audio playback.</strong></div>
+              <div class="field-hint" data-i18n="banner.playback_paused_hint">Click Resume Audio to hear nearby players.</div>
             </div>
           </div>
-          <button type="button" id="btn-resume-audio" class="mc-btn mc-btn--sm mc-btn--aqua">Resume Audio</button>
+          <button type="button" id="btn-resume-audio" class="mc-btn mc-btn--sm mc-btn--aqua" data-i18n="banner.resume_audio_btn">Resume Audio</button>
         </div>
       </div>
 
@@ -263,14 +268,14 @@
                 <svg id="hero-mic-svg" class="px-icon px-icon--xl"><use href="#px-mic"/></svg>
               </div>
               <div>
-                <h2 id="hero-state-title" class="mic-state-title">CONNECTING...</h2>
-                <div id="hero-state-sub" class="mic-state-sub">Waiting for voice server</div>
+                <h2 id="hero-state-title" class="mic-state-title" data-i18n="hero.connecting_title">CONNECTING...</h2>
+                <div id="hero-state-sub" class="mic-state-sub" data-i18n="hero.connecting_sub">Waiting for voice server handshake</div>
               </div>
             </div>
 
             <div class="mic-level-wrap">
               <div class="mic-level-labels">
-                <span id="hero-meter-label">Input Level</span>
+                <span id="hero-meter-label" data-i18n="meter.input_level">Input Level</span>
                 <span id="hero-meter-db">-100 dB</span>
               </div>
               <div class="meter-track">
@@ -289,8 +294,8 @@
                   <span id="btn-mic-key" class="key-chip hidden"></span>
                 </div>
                 <div>
-                  <div class="action-btn__label">Mic: <span id="btn-mic-state-text">ON</span></div>
-                  <div id="btn-mic-sub" class="action-btn__state">Click to mute</div>
+                  <div class="action-btn__label"><span data-i18n="controls.mic_prefix">Mic: </span><span id="btn-mic-state-text" data-i18n="common.on">ON</span></div>
+                  <div id="btn-mic-sub" class="action-btn__state" data-i18n="controls.mic_active_sub">Active (click to mute)</div>
                 </div>
               </button>
 
@@ -299,8 +304,8 @@
                   <svg id="btn-deafen-icon" class="px-icon"><use href="#px-headphones"/></svg>
                 </div>
                 <div>
-                  <div class="action-btn__label">Sound: <span id="btn-deafen-state-text">ON</span></div>
-                  <div id="btn-deafen-sub" class="action-btn__state">Deafen output</div>
+                  <div class="action-btn__label"><span data-i18n="controls.sound_prefix">Sound: </span><span id="btn-deafen-state-text" data-i18n="common.on">ON</span></div>
+                  <div id="btn-deafen-sub" class="action-btn__state" data-i18n="controls.deafen_sub">Click to deafen</div>
                 </div>
               </button>
             </div>
@@ -308,7 +313,7 @@
             <div class="quick-sliders-row">
               <div class="mini-slider-box">
                 <div class="field-inline">
-                  <label class="field-label" for="volume">Speakers Volume</label>
+                  <label class="field-label" for="volume" data-i18n="controls.speakers_volume">Speakers Volume</label>
                   <span id="volume-val" class="field-val">100%</span>
                 </div>
                 <input type="range" id="volume" class="mc-range" min="0" max="200" value="100">
@@ -316,7 +321,7 @@
 
               <div class="mini-slider-box">
                 <div class="field-inline">
-                  <label class="field-label" for="mic-gain">Microphone Gain</label>
+                  <label class="field-label" for="mic-gain" data-i18n="controls.mic_gain">Microphone Gain</label>
                   <span id="mic-gain-val" class="field-val">100%</span>
                 </div>
                 <input type="range" id="mic-gain" class="mc-range" min="0" max="200" value="100">
@@ -330,19 +335,19 @@
           <div class="mc-tabs" role="tablist">
             <button type="button" class="mc-tab is-active" data-tab="voice" role="tab" aria-selected="true">
               <svg class="px-icon"><use href="#px-settings"/></svg>
-              Voice &amp; Controls
+              <span data-i18n="tabs.voice">Voice &amp; Controls</span>
             </button>
             <button type="button" class="mc-tab" data-tab="players" role="tab" aria-selected="false">
               <svg class="px-icon"><use href="#px-players"/></svg>
-              Players (<span id="speaker-count-badge">0</span>)
+              <span><span data-i18n="tabs.players">Players</span> (<span id="speaker-count-badge">0</span>)</span>
             </button>
             <button type="button" class="mc-tab" data-tab="overlay" role="tab" aria-selected="false">
               <svg class="px-icon"><use href="#px-overlay"/></svg>
-              Overlay Config
+              <span data-i18n="tabs.overlay">Overlay Config</span>
             </button>
             <button type="button" class="mc-tab" data-tab="log" role="tab" aria-selected="false">
               <svg class="px-icon"><use href="#px-warn"/></svg>
-              Log
+              <span data-i18n="tabs.log">Log</span>
             </button>
           </div>
 
@@ -352,42 +357,42 @@
               <!-- Audio Devices -->
               <div class="section-box">
                 <h3 class="section-title">
-                  <span>Audio Devices</span>
+                  <span data-i18n="devices.title">Audio Devices</span>
                   <button type="button" id="btn-refresh-devices" class="mc-btn mc-btn--xs">
                     <svg class="px-icon"><use href="#px-refresh"/></svg>
-                    Refresh
+                    <span data-i18n="common.refresh">Refresh</span>
                   </button>
                 </h3>
 
                 <div class="field-row">
-                  <label class="field-label" for="mic-select">Recording Device (Microphone)</label>
+                  <label class="field-label" for="mic-select" data-i18n="devices.mic_label">Recording Device (Microphone)</label>
                   <select id="mic-select" class="mc-select"></select>
                 </div>
 
                 <div class="field-row">
-                  <label class="field-label" for="speaker-select">Playback Device (Speakers)</label>
+                  <label class="field-label" for="speaker-select" data-i18n="devices.speaker_label">Playback Device (Speakers)</label>
                   <select id="speaker-select" class="mc-select"></select>
-                  <div id="sinkid-note" class="field-hint hidden">This browser does not support speaker selection (setSinkId); system default output is used.</div>
+                  <div id="sinkid-note" class="field-hint hidden" data-i18n="devices.sinkid_unsupported">This browser does not support speaker selection (setSinkId); system default output is used.</div>
                 </div>
 
                 <div class="toggle-row">
                   <div>
-                    <div class="field-label">Test Microphone (Local Loopback)</div>
-                    <div class="field-hint">Hear your own mic locally without sending to server</div>
+                    <div class="field-label" data-i18n="devices.mic_test_label">Test Microphone (Local Loopback)</div>
+                    <div class="field-hint" data-i18n="devices.mic_test_hint">Hear your own mic locally without sending to server</div>
                   </div>
-                  <button type="button" id="btn-mic-test" class="mc-btn mc-btn--sm toggle-pill">OFF</button>
+                  <button type="button" id="btn-mic-test" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.off">OFF</button>
                 </div>
               </div>
 
               <!-- Voice Activation Threshold -->
               <div class="section-box">
                 <h3 class="section-title">
-                  <span>Voice Activation</span>
+                  <span data-i18n="vad.title">Voice Activation</span>
                 </h3>
 
                 <div id="vad-config-block" class="field-row">
                   <div class="field-inline">
-                    <label class="field-label" for="vad-threshold">Voice Activation Threshold</label>
+                    <label class="field-label" for="vad-threshold" data-i18n="vad.threshold_label">Voice Activation Threshold</label>
                     <span id="vad-threshold-val" class="field-val">-100 dB (Open Mic)</span>
                   </div>
                   <div class="meter-track" style="height: 16px;">
@@ -396,13 +401,13 @@
                   </div>
                   <input type="range" id="vad-threshold" class="mc-range" min="-100" max="0" step="1" value="-100">
                   <div class="preset-row">
-                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-100">Open Mic</button>
-                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-65">-65 dB</button>
-                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-50">-50 dB</button>
-                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-35">-35 dB</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-100" data-i18n="vad.open_mic">Open Mic</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-65" data-i18n="vad.preset_65">-65 dB</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-50" data-i18n="vad.preset_50">-50 dB</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-vad-preset="-35" data-i18n="vad.preset_35">-35 dB</button>
                   </div>
                   <div class="field-inline" style="margin-top: 4px;">
-                    <label class="field-label" for="vad-holdover">Voice Holdover Delay</label>
+                    <label class="field-label" for="vad-holdover" data-i18n="vad.holdover_label">Voice Holdover Delay</label>
                     <span id="vad-holdover-val" class="field-val">300 ms</span>
                   </div>
                   <input type="range" id="vad-holdover" class="mc-range" min="0" max="1000" step="25" value="300">
@@ -412,24 +417,24 @@
               <!-- Minecraft Keybind (Works While Playing Minecraft) -->
               <div class="section-box">
                 <h3 class="section-title">
-                  <span>Minecraft Keybind</span>
-                  <span id="ingame-sync-pill" class="sync-pill sync-pill--warn">Server Sync: Offline</span>
+                  <span data-i18n="keybind.title">Minecraft Keybind</span>
+                  <span id="ingame-sync-pill" class="sync-pill sync-pill--warn" data-i18n="keybind.sync_offline">Server Sync: Offline</span>
                 </h3>
 
-                <div class="field-hint">
+                <div class="field-hint" data-i18n="keybind.section_hint">
                   Toggle your microphone On/Off directly inside Minecraft (synced live via the server, zero client mods).
                 </div>
 
                 <div class="field-row">
-                  <label class="field-label" for="ingame-trigger-mode">Mic On/Off Keybind (In-Game)</label>
+                  <label class="field-label" for="ingame-trigger-mode" data-i18n="keybind.select_label">Mic On/Off Keybind (In-Game)</label>
                   <select id="ingame-trigger-mode" class="mc-select">
-                    <option value="off">Off (Disabled)</option>
-                    <option value="double_shift">Double Shift</option>
-                    <option value="double_ctrl">Double Ctrl</option>
-                    <option value="shift_f">Shift+F</option>
-                    <option value="shift_q">Shift+Q</option>
+                    <option value="off" data-i18n="keybind.off_option">Off (Disabled)</option>
+                    <option value="double_shift" data-i18n="keybind.double_shift_label">Double Shift</option>
+                    <option value="double_ctrl" data-i18n="keybind.double_ctrl_label">Double Ctrl</option>
+                    <option value="shift_f" data-i18n="keybind.shift_f_label">Shift+F</option>
+                    <option value="shift_q" data-i18n="keybind.shift_q_label">Shift+Q</option>
                   </select>
-                  <div id="ingame-trigger-hint" class="field-hint">
+                  <div id="ingame-trigger-hint" class="field-hint" data-i18n="keybind.off_hint">
                     No Minecraft keybind active. You can still run /mic in Minecraft chat or click Mic On/Off here.
                   </div>
                 </div>
@@ -438,35 +443,21 @@
               <!-- Mic & Audio Processing -->
               <div class="section-box">
                 <h3 class="section-title">
-                  <span>Mic &amp; Audio Processing</span>
+                  <span data-i18n="processing.title">Mic &amp; Audio Processing</span>
                 </h3>
 
-                <div class="field-row">
-                  <label class="field-label" for="mic-mute-mode">Mic Off Behavior</label>
-                  <select id="mic-mute-mode" class="mc-select">
-                    <option value="soft">Soft Mute (Instant 0ms, keeps mic stream ready)</option>
-                    <option value="track">Disable Audio Track (track.enabled = false)</option>
-                    <option value="release">Release Mic Hardware (stops capture stream)</option>
-                  </select>
+                <div class="toggle-row">
+                  <span class="field-label" data-i18n="processing.mute_on_deafen">Mute Mic When Deafened</span>
+                  <button type="button" id="toggle-mute-on-deafen" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Show Mic On/Off Button in Bar</span>
-                  <button type="button" id="toggle-mic-btn-visible" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="toggle-row">
-                  <span class="field-label">Mute Mic When Deafened</span>
-                  <button type="button" id="toggle-mute-on-deafen" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="toggle-row">
-                  <span class="field-label">UI Sound Cues (Click/Beep)</span>
-                  <button type="button" id="toggle-ui-sounds" class="mc-btn mc-btn--sm toggle-pill">ON</button>
+                  <span class="field-label" data-i18n="processing.ui_sounds">UI Sound Cues (Click/Beep)</span>
+                  <button type="button" id="toggle-ui-sounds" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="field-row">
-                  <span class="field-label">Browser Mic Filters (restarts mic)</span>
+                  <span class="field-label" data-i18n="processing.filters_label">Browser Mic Filters (restarts mic)</span>
                   <div class="preset-row">
                     <button type="button" id="toggle-ec" class="mc-btn mc-btn--xs">Echo Cancel: ON</button>
                     <button type="button" id="toggle-ns" class="mc-btn mc-btn--xs">Noise Supp: ON</button>
@@ -475,7 +466,7 @@
                 </div>
 
                 <div class="field-inline" style="margin-top: 4px;">
-                  <button type="button" id="btn-reset-audio" class="mc-btn mc-btn--xs mc-btn--red">Reset Audio Defaults</button>
+                  <button type="button" id="btn-reset-audio" class="mc-btn mc-btn--xs mc-btn--red" data-i18n="processing.reset_audio">Reset Audio Defaults</button>
                 </div>
               </div>
             </div>
@@ -484,140 +475,62 @@
           <!-- TAB 2: OVERLAY CONFIG -->
           <div id="tab-overlay" class="tab-panel" role="tabpanel">
             <div id="pip-active-notice" class="pip-notice hidden" style="margin-bottom: 12px;">
-              <span>Overlay is currently popped out in an Always-on-Top window.</span>
-              <button type="button" id="btn-recall-pip" class="mc-btn mc-btn--xs">Dock Back to Page</button>
+              <span data-i18n="overlay.pip_active">Overlay is currently popped out in an Always-on-Top window.</span>
+              <button type="button" id="btn-recall-pip" class="mc-btn mc-btn--xs" data-i18n="overlay.dock_back">Dock Back to Page</button>
             </div>
 
             <div class="settings-grid">
-              <div class="section-box">
+              <div class="section-box section-box--full">
                 <h3 class="section-title">
-                  <span>Overlay Visibility &amp; Window</span>
+                  <span data-i18n="overlay.appearance_title">Overlay Appearance &amp; Elements</span>
                 </h3>
 
                 <div class="toggle-row">
-                  <div>
-                    <div class="field-label">Enable Microphone State Overlay</div>
-                    <div class="field-hint">Floating Simple Voice Chat style HUD</div>
-                  </div>
-                  <button type="button" id="toggle-overlay-enabled" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="field-row">
-                  <label class="field-label" for="overlay-style">Overlay Layout Mode</label>
-                  <select id="overlay-style" class="mc-select">
-                    <option value="icon">Compact Icon Only</option>
-                    <option value="badge">Mic State Badge (Icon + Status)</option>
-                    <option value="hud">Full HUD (Status + Nearby Speakers)</option>
-                  </select>
-                </div>
-
-                <div class="field-row">
-                  <label class="field-label" for="overlay-theme">Overlay Theme</label>
-                  <select id="overlay-theme" class="mc-select">
-                    <option value="svc-dark">Simple Voice Chat Dark</option>
-                    <option value="mc-stone">Minecraft Stone GUI</option>
-                    <option value="transparent">Transparent (OBS / Stream)</option>
-                    <option value="high-contrast">High Contrast</option>
-                  </select>
-                </div>
-
-                <div class="field-row">
-                  <label class="field-label" for="overlay-position">Overlay Corner Position</label>
-                  <select id="overlay-position" class="mc-select">
-                    <option value="top-left">Top Left</option>
-                    <option value="top-right">Top Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
-                    <option value="custom">Custom (Drag Overlay)</option>
-                  </select>
+                  <span class="field-label" data-i18n="overlay.show_label">Show State Text (SPEAKING / MUTED)</span>
+                  <button type="button" id="toggle-ov-label" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Lock Overlay Dragging</span>
-                  <button type="button" id="toggle-overlay-lock" class="mc-btn mc-btn--sm toggle-pill">OFF</button>
-                </div>
-
-                <div class="preset-row">
-                  <button type="button" id="btn-overlay-popout" class="mc-btn mc-btn--sm mc-btn--aqua">
-                    <svg class="px-icon"><use href="#px-popout"/></svg>
-                    Pop Out Window
-                  </button>
-                  <button type="button" id="btn-overlay-reset-pos" class="mc-btn mc-btn--sm">Reset Pos</button>
-                </div>
-              </div>
-
-              <div class="section-box">
-                <h3 class="section-title">
-                  <span>Overlay Appearance &amp; Elements</span>
-                </h3>
-
-                <div class="field-row">
-                  <div class="field-inline">
-                    <label class="field-label" for="overlay-scale">Overlay Scale</label>
-                    <span id="overlay-scale-val" class="field-val">100%</span>
-                  </div>
-                  <input type="range" id="overlay-scale" class="mc-range" min="75" max="200" step="5" value="100">
-                </div>
-
-                <div class="field-row">
-                  <div class="field-inline">
-                    <label class="field-label" for="overlay-opacity">Overlay Opacity</label>
-                    <span id="overlay-opacity-val" class="field-val">95%</span>
-                  </div>
-                  <input type="range" id="overlay-opacity" class="mc-range" min="25" max="100" step="5" value="95">
+                  <span class="field-label" data-i18n="overlay.show_name">Show Player Name in Overlay</span>
+                  <button type="button" id="toggle-ov-name" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Show State Text (SPEAKING / MUTED)</span>
-                  <button type="button" id="toggle-ov-label" class="mc-btn mc-btn--sm toggle-pill">ON</button>
+                  <span class="field-label" data-i18n="overlay.show_controls">Show Quick Mic Button</span>
+                  <button type="button" id="toggle-ov-controls" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Show Player Name in Overlay</span>
-                  <button type="button" id="toggle-ov-name" class="mc-btn mc-btn--sm toggle-pill">ON</button>
+                  <span class="field-label" data-i18n="overlay.show_meter">Show Live Mic Bar</span>
+                  <button type="button" id="toggle-ov-meter" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Show Quick Mic Button</span>
-                  <button type="button" id="toggle-ov-controls" class="mc-btn mc-btn--sm toggle-pill">ON</button>
+                  <span class="field-label" data-i18n="overlay.show_keys">Show Minecraft Keybind Hint</span>
+                  <button type="button" id="toggle-ov-keys" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="toggle-row">
-                  <span class="field-label">Show Live Mic Bar</span>
-                  <button type="button" id="toggle-ov-meter" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="toggle-row">
-                  <span class="field-label">Show Minecraft Keybind Hint</span>
-                  <button type="button" id="toggle-ov-keys" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="toggle-row">
-                  <span class="field-label">Show Active Speakers (HUD mode)</span>
-                  <button type="button" id="toggle-ov-speakers" class="mc-btn mc-btn--sm toggle-pill">ON</button>
-                </div>
-
-                <div class="toggle-row">
-                  <span class="field-label">Dim Overlay When Idle</span>
-                  <button type="button" id="toggle-ov-dim" class="mc-btn mc-btn--sm toggle-pill">OFF</button>
+                  <span class="field-label" data-i18n="overlay.show_speakers">Show Active Speakers</span>
+                  <button type="button" id="toggle-ov-speakers" class="mc-btn mc-btn--sm toggle-pill" data-i18n="common.on">ON</button>
                 </div>
 
                 <div class="field-inline" style="margin-top: 4px;">
-                  <button type="button" id="btn-reset-overlay" class="mc-btn mc-btn--xs mc-btn--red">Reset Overlay Defaults</button>
+                  <button type="button" id="btn-reset-overlay" class="mc-btn mc-btn--xs mc-btn--red" data-i18n="overlay.reset_defaults">Reset Overlay Defaults</button>
                 </div>
               </div>
 
               <!-- OBS / Standalone Overlay Link Helper -->
               <div class="section-box section-box--full">
                 <h3 class="section-title">
-                  <span>Standalone / OBS Browser Source URL</span>
+                  <span data-i18n="overlay.obs_title">Standalone / OBS Browser Source URL</span>
                 </h3>
-                <div class="field-hint">
+                <div class="field-hint" data-i18n="overlay.obs_hint">
                   Open this URL in a small window or OBS Browser Source (add &amp;transparent=1 for transparent backdrop).
                 </div>
                 <div class="input-with-btn">
                   <input type="text" id="obs-url-input" class="mc-input" readonly>
-                  <button type="button" id="btn-copy-obs-url" class="mc-btn mc-btn--sm">Copy URL</button>
+                  <button type="button" id="btn-copy-obs-url" class="mc-btn mc-btn--sm" data-i18n="overlay.copy_url">Copy URL</button>
                 </div>
               </div>
             </div>
@@ -628,34 +541,34 @@
             <div class="settings-grid">
               <div class="section-box section-box--full">
                 <h3 class="section-title">
-                  <span>Adjust Player Volumes</span>
+                  <span data-i18n="players.title">Adjust Player Volumes</span>
                   <div class="preset-row">
                     <span id="players-summary" class="field-hint">Online: 0 • Voice: 0</span>
                     <button type="button" id="btn-refresh-players" class="mc-btn mc-btn--xs">
                       <svg class="px-icon"><use href="#px-refresh"/></svg>
-                      Refresh
+                      <span data-i18n="common.refresh">Refresh</span>
                     </button>
-                    <button type="button" id="btn-reset-all-volumes" class="mc-btn mc-btn--xs">Reset Volumes</button>
+                    <button type="button" id="btn-reset-all-volumes" class="mc-btn mc-btn--xs" data-i18n="players.reset_volumes">Reset Volumes</button>
                   </div>
                 </h3>
 
                 <div class="players-toolbar">
                   <div class="players-search-wrap">
-                    <input type="text" id="player-search" class="mc-input" placeholder="Search server players...">
+                    <input type="text" id="player-search" class="mc-input" data-i18n-placeholder="players.search_placeholder" placeholder="Search server players...">
                   </div>
                   <div class="preset-row">
-                    <button type="button" class="mc-btn mc-btn--xs mc-btn--green" data-player-filter="all">All</button>
-                    <button type="button" class="mc-btn mc-btn--xs" data-player-filter="voice">Voice Only</button>
-                    <button type="button" class="mc-btn mc-btn--xs" data-player-filter="speaking">Speaking</button>
+                    <button type="button" class="mc-btn mc-btn--xs mc-btn--green" data-player-filter="all" data-i18n="players.filter_all">All</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-player-filter="voice" data-i18n="players.filter_voice">Voice Only</button>
+                    <button type="button" class="mc-btn mc-btn--xs" data-player-filter="speaking" data-i18n="players.filter_speaking">Speaking</button>
                   </div>
                 </div>
 
-                <div class="field-hint">
+                <div class="field-hint" data-i18n="players.section_hint">
                   Adjust individual player volumes (0%-200%) or mute players like in Simple Voice Chat. Changes save automatically per player.
                 </div>
 
                 <div id="speakers-list" class="speakers-list">
-                  <div class="empty-state">No other players online on the server yet. Online players will appear here automatically once connected.</div>
+                  <div class="empty-state" data-i18n="players.empty_server">No other players online on the server yet. Online players will appear here automatically once connected.</div>
                 </div>
               </div>
             </div>
@@ -666,10 +579,10 @@
             <div class="settings-grid">
               <div class="section-box section-box--full">
                 <h3 class="section-title">
-                  <span>Connection &amp; Event Log</span>
+                  <span data-i18n="log.title">Connection &amp; Event Log</span>
                   <div class="preset-row">
                     <span id="session-meta" class="field-hint">Session: none</span>
-                    <button type="button" id="btn-clear-log" class="mc-btn mc-btn--xs">Clear Log</button>
+                    <button type="button" id="btn-clear-log" class="mc-btn mc-btn--xs" data-i18n="log.clear">Clear Log</button>
                   </div>
                 </h3>
                 <div id="event-log" class="event-log" aria-live="polite"></div>
@@ -681,29 +594,21 @@
 
       <!-- Status Footer -->
       <footer class="status-footer">
-        <div id="status">Connecting...</div>
-        <div class="codec-badge">Opus 48 kHz • 20 ms • Mono</div>
+        <div id="status" data-i18n="footer.connecting">Connecting...</div>
+        <div class="codec-badge" data-i18n="footer.codec">Opus 48 kHz • 20 ms • Mono</div>
       </footer>
     </div>
   </div>
 
-  <!-- Configurable Floating Microphone State Overlay -->
-  <aside id="voice-overlay" class="voice-overlay theme-svc-dark pos-bottom-left" aria-label="Microphone State Overlay">
+  <!-- Microphone State Overlay (used for Pop-Out PiP & Standalone/OBS ?overlay=1) -->
+  <aside id="voice-overlay" class="voice-overlay theme-svc-dark hidden" data-i18n-aria-label="overlay.aria_label" aria-label="Microphone State Overlay">
     <div class="overlay-head">
       <div id="ov-icon-wrap" class="overlay-icon-wrap">
         <svg id="ov-mic-svg" class="px-icon px-icon--lg"><use href="#px-mic"/></svg>
       </div>
       <div class="overlay-text">
-        <div id="ov-state-line" class="overlay-state-line">CONNECTING</div>
+        <div id="ov-state-line" class="overlay-state-line" data-i18n="hero.connecting_ov">CONNECTING</div>
         <div id="ov-sub-line" class="overlay-sub-line">Voice Web Bridge</div>
-      </div>
-      <div class="overlay-tools">
-        <span id="ov-drag-handle" class="overlay-drag-handle" title="Drag overlay">
-          <svg class="px-icon"><use href="#px-grip"/></svg>
-        </span>
-        <button type="button" id="ov-btn-popout" class="mc-btn mc-btn--xs" title="Pop out window">
-          <svg class="px-icon"><use href="#px-popout"/></svg>
-        </button>
       </div>
     </div>
 
